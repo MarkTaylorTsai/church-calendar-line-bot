@@ -1,0 +1,307 @@
+// LINE webhook handler
+import { LineService } from '../services/LineService.js';
+import { ActivityService } from '../services/ActivityService.js';
+import { errorHandler } from '../middleware/errorHandler.js';
+import { isAuthorizedUser, logAccessAttempt } from '../middleware/auth.js';
+
+const lineService = new LineService();
+const activityService = new ActivityService();
+
+export default async function handler(req, res) {
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ 
+        error: 'Method not allowed',
+        message: 'Only POST method is supported for webhook'
+      });
+    }
+    
+    // Verify LINE webhook signature
+    const signature = req.headers['x-line-signature'];
+    if (!signature) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Missing LINE signature header',
+        code: 'MISSING_SIGNATURE'
+      });
+    }
+    
+    const isValid = lineService.verifyWebhook(signature, JSON.stringify(req.body));
+    if (!isValid) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid LINE signature',
+        code: 'INVALID_SIGNATURE'
+      });
+    }
+    
+    // Handle LINE webhook events
+    return await handleLineWebhook(req, res);
+  } catch (error) {
+    return errorHandler(error, req, res);
+  }
+}
+
+async function handleLineWebhook(req, res) {
+  const events = req.body.events;
+  
+  if (!events || events.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: 'No events to process'
+    });
+  }
+  
+  for (const event of events) {
+    try {
+      await processEvent(event);
+    } catch (error) {
+      console.error('Error processing event:', error);
+      // Continue processing other events even if one fails
+    }
+  }
+  
+  return res.status(200).json({
+    success: true,
+    message: 'Webhook events processed'
+  });
+}
+
+async function processEvent(event) {
+  switch (event.type) {
+    case 'message':
+      await handleMessageEvent(event);
+      break;
+    case 'follow':
+      await handleFollowEvent(event);
+      break;
+    case 'unfollow':
+      await handleUnfollowEvent(event);
+      break;
+    default:
+      console.log('Unhandled event type:', event.type);
+  }
+}
+
+async function handleMessageEvent(event) {
+  const message = event.message;
+  const userId = event.source.userId;
+  
+  // Check if user is authorized for CRUD operations
+  const isAuthorized = isAuthorizedUser(userId);
+  
+  if (message.type === 'text') {
+    const userMessage = message.text.toLowerCase().trim();
+    
+    // Handle different commands
+    if (userMessage === 'help' || userMessage === '幫助') {
+      await lineService.sendMessage(userId, getHelpMessage(isAuthorized));
+      logAccessAttempt({ body: { source: { userId } } }, 'HELP_COMMAND', true);
+    } else if (userMessage === 'list' || userMessage === '列表' || userMessage === '查看 全部') {
+      await handleViewAllActivities(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
+    } else if (userMessage === '查看 這個月' || userMessage === '查看 本月') {
+      await handleViewMonthlyActivities(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_MONTHLY_ACTIVITIES', true);
+    } else if (userMessage === '查看 這個禮拜' || userMessage === '查看 本週') {
+      await handleViewWeeklyActivities(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
+    } else if (userMessage.startsWith('add') || userMessage.startsWith('create') || userMessage.startsWith('新增')) {
+      if (isAuthorized) {
+        await lineService.sendMessage(userId, 'Activity creation via LINE will be implemented soon.');
+        logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', true);
+      } else {
+        await lineService.sendMessage(userId, 'Sorry, you are not authorized to create activities. Contact the administrator.');
+        logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', false);
+      }
+    } else if (userMessage.startsWith('更新 ')) {
+      if (isAuthorized) {
+        await handleUpdateActivity(userId, userMessage);
+        logAccessAttempt({ body: { source: { userId } } }, 'UPDATE_COMMAND', true);
+      } else {
+        await lineService.sendMessage(userId, 'Sorry, you are not authorized to update activities. Contact the administrator.');
+        logAccessAttempt({ body: { source: { userId } } }, 'UPDATE_COMMAND', false);
+      }
+    } else if (userMessage.startsWith('刪除 ')) {
+      if (isAuthorized) {
+        await handleDeleteActivity(userId, userMessage);
+        logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', true);
+      } else {
+        await lineService.sendMessage(userId, 'Sorry, you are not authorized to delete activities. Contact the administrator.');
+        logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', false);
+      }
+    } else if (userMessage.startsWith('查看 ')) {
+      // Handle specific activity view by ID
+      const parts = userMessage.split(' ');
+      if (parts.length === 2 && !isNaN(parts[1])) {
+        await handleViewActivityById(userId, parseInt(parts[1]));
+        logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', true);
+      } else {
+        await lineService.sendMessage(userId, 'Invalid format. Use "查看 [ID]" to view a specific activity.');
+        logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', false);
+      }
+    } else {
+      await lineService.sendMessage(userId, 'Sorry, I don\'t understand that command. Type "help" for available commands.');
+      logAccessAttempt({ body: { source: { userId } } }, 'UNKNOWN_COMMAND', false);
+    }
+  }
+}
+
+async function handleFollowEvent(event) {
+  const userId = event.source.userId;
+  const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
+  
+  await lineService.sendMessage(userId, welcomeMessage);
+}
+
+async function handleUnfollowEvent(event) {
+  // Log unfollow event for analytics
+  console.log('User unfollowed:', event.source.userId);
+}
+
+async function handleViewAllActivities(userId) {
+  try {
+    const activities = await activityService.getActivities();
+    await lineService.sendActivityList(userId, activities, '所有活動', true);
+  } catch (error) {
+    console.error('Error fetching all activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
+  }
+}
+
+async function handleViewMonthlyActivities(userId) {
+  try {
+    const { month, year } = getCurrentMonthAndYear();
+    const activities = await activityService.getActivitiesForMonth(month, year);
+    await lineService.sendActivityList(userId, activities, '本月活動', true);
+  } catch (error) {
+    console.error('Error fetching monthly activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得本月活動，請稍後再試。');
+  }
+}
+
+async function handleViewWeeklyActivities(userId) {
+  try {
+    const activities = await activityService.getActivitiesForNextWeek();
+    await lineService.sendActivityList(userId, activities, '本週活動', false);
+  } catch (error) {
+    console.error('Error fetching weekly activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得本週活動，請稍後再試。');
+  }
+}
+
+async function handleViewActivityById(userId, activityId) {
+  try {
+    const activity = await activityService.getActivityById(activityId);
+    await lineService.sendActivityDetails(userId, activity);
+  } catch (error) {
+    if (error.message === 'Activity not found') {
+      await lineService.sendMessage(userId, `找不到 ID 為 ${activityId} 的活動。`);
+    } else {
+      console.error('Error fetching activity by ID:', error);
+      await lineService.sendErrorMessage(userId, '無法取得活動詳情，請稍後再試。');
+    }
+  }
+}
+
+async function handleUpdateActivity(userId, userMessage) {
+  try {
+    // Parse command: "更新 id 日期/名稱"
+    const parts = userMessage.split(' ');
+    if (parts.length < 3) {
+      await lineService.sendMessage(userId, '格式錯誤。請使用：更新 [ID] [日期/名稱]\n例如：更新 1 2025-10-15 或 更新 1 新的活動名稱');
+      return;
+    }
+
+    const activityId = parseInt(parts[1]);
+    const updateValue = parts.slice(2).join(' ');
+
+    // Determine if it's a date or name update
+    let updateData = {};
+    if (isValidDate(updateValue)) {
+      updateData.date = updateValue;
+    } else {
+      updateData.name = updateValue;
+    }
+
+    const updatedActivity = await activityService.updateActivity(activityId, updateData);
+    await lineService.sendSuccessMessage(userId, `活動已成功更新：\n${formatActivityForDisplay(updatedActivity)}`);
+  } catch (error) {
+    if (error.message === 'Activity not found') {
+      await lineService.sendMessage(userId, '找不到指定的活動。');
+    } else {
+      console.error('Error updating activity:', error);
+      await lineService.sendErrorMessage(userId, '更新活動時發生錯誤，請稍後再試。');
+    }
+  }
+}
+
+async function handleDeleteActivity(userId, userMessage) {
+  try {
+    // Parse command: "刪除 id"
+    const parts = userMessage.split(' ');
+    if (parts.length !== 2) {
+      await lineService.sendMessage(userId, '格式錯誤。請使用：刪除 [ID]\n例如：刪除 1');
+      return;
+    }
+
+    const activityId = parseInt(parts[1]);
+    
+    // Get activity details before deletion for confirmation message
+    const activity = await activityService.getActivityById(activityId);
+    await activityService.deleteActivity(activityId);
+    
+    await lineService.sendSuccessMessage(userId, `活動已成功刪除：\n${formatActivityForDisplay(activity)}`);
+  } catch (error) {
+    if (error.message === 'Activity not found') {
+      await lineService.sendMessage(userId, '找不到指定的活動。');
+    } else {
+      console.error('Error deleting activity:', error);
+      await lineService.sendErrorMessage(userId, '刪除活動時發生錯誤，請稍後再試。');
+    }
+  }
+}
+
+function getCurrentMonthAndYear() {
+  const now = new Date();
+  return {
+    month: now.getMonth() + 1,
+    year: now.getFullYear()
+  };
+}
+
+function isValidDate(dateString) {
+  if (!dateString) return false;
+  
+  // Check if it's a valid date format (YYYY-MM-DD)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(dateString)) return false;
+  
+  const date = new Date(dateString);
+  return !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
+}
+
+function formatActivityForDisplay(activity) {
+  const date = new Date(activity.date);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const year = date.getFullYear();
+  const formattedDate = `${month}-${day}-${year}`;
+  
+  const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+  const dayOfWeek = days[date.getDay()];
+  
+  return `ID: ${activity.id} | ${formattedDate} ${dayOfWeek} ${activity.name}`;
+}
+
+function getHelpMessage(isAuthorized = false) {
+  let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 [ID] - 查看特定活動`;
+  
+  if (isAuthorized) {
+    message += `\n\n管理員功能：\n• 新增 - 新增活動\n• 更新 [ID] [日期/名稱] - 更新活動\n• 刪除 [ID] - 刪除活動`;
+  }
+  
+  message += `\n\n更多功能即將推出！`;
+  
+  return message;
+}

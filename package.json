@@ -1,0 +1,42 @@
+{
+  "name": "church-calendar-line-bot",
+  "version": "1.0.0",
+  "description": "LINE Bot for church activity reminders",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "start": "node index.js",
+    "setup-db": "node scripts/setup-db.js",
+    "seed-data": "node scripts/seed-data.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0",
+    "nodemon": "^3.0.2",
+    "@types/jest": "^29.5.0"
+  },
+  "keywords": [
+    "line-bot",
+    "reminder",
+    "church",
+    "calendar",
+    "nodejs",
+    "vercel"
+  ],
+  "author": "Church Calendar Bot",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
