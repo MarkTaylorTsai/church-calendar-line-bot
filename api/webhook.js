@@ -106,6 +106,12 @@ async function handleMessageEvent(event) {
     } else if (userMessage === '查看 這個禮拜' || userMessage === '查看 本週') {
       await handleViewWeeklyActivities(userId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
+    } else if (userMessage === '查看 下個月') {
+      await handleViewNextMonthActivities(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
+    } else if (userMessage.startsWith('查看 ') && (userMessage.includes('月') || userMessage.includes('Month'))) {
+      await handleViewSpecificMonthActivities(userId, userMessage);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_SPECIFIC_MONTH_ACTIVITIES', true);
     } else if (userMessage.startsWith('add') || userMessage.startsWith('create') || userMessage.startsWith('新增')) {
       if (isAuthorized) {
         await handleCreateActivity(userId, userMessage);
@@ -187,6 +193,33 @@ async function handleViewWeeklyActivities(userId) {
   } catch (error) {
     console.error('Error fetching weekly activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得本週活動，請稍後再試。');
+  }
+}
+
+async function handleViewNextMonthActivities(userId) {
+  try {
+    const { month, year } = getNextMonthAndYear();
+    const activities = await activityService.getActivitiesForMonth(month, year);
+    await lineService.sendActivityList(userId, activities, '下個月活動', true);
+  } catch (error) {
+    console.error('Error fetching next month activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得下個月活動，請稍後再試。');
+  }
+}
+
+async function handleViewSpecificMonthActivities(userId, userMessage) {
+  try {
+    const { month, year } = parseMonthFromMessage(userMessage);
+    const activities = await activityService.getActivitiesForMonth(month, year);
+    const monthName = getMonthName(month);
+    await lineService.sendActivityList(userId, activities, `${year}年${monthName}活動`, true);
+  } catch (error) {
+    if (error.message === 'Invalid month format') {
+      await lineService.sendMessage(userId, '月份格式錯誤。請使用：查看 11月 或 查看 十一月');
+    } else {
+      console.error('Error fetching specific month activities:', error);
+      await lineService.sendErrorMessage(userId, '無法取得指定月份活動，請稍後再試。');
+    }
   }
 }
 
@@ -307,6 +340,97 @@ function getCurrentMonthAndYear() {
   };
 }
 
+function getNextMonthAndYear() {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return {
+    month: nextMonth.getMonth() + 1,
+    year: nextMonth.getFullYear()
+  };
+}
+
+function parseMonthFromMessage(userMessage) {
+  // Extract month from messages like "查看 11月", "查看 十一月", "查看 11月 2025"
+  const parts = userMessage.split(' ');
+  
+  if (parts.length < 2) {
+    throw new Error('Invalid month format');
+  }
+  
+  const monthText = parts[1];
+  const currentYear = new Date().getFullYear();
+  let year = currentYear;
+  
+  // Check if year is specified (e.g., "查看 11月 2025")
+  if (parts.length >= 3 && !isNaN(parseInt(parts[2]))) {
+    year = parseInt(parts[2]);
+  }
+  
+  // Parse month from various formats
+  let month = null;
+  
+  // Handle numeric format (11月, 1月, etc.)
+  if (monthText.match(/^\d+月$/)) {
+    month = parseInt(monthText.replace('月', ''));
+  }
+  // Handle Chinese month names
+  else if (monthText.match(/^[一二三四五六七八九十]+月$/)) {
+    month = parseChineseMonth(monthText);
+  }
+  // Handle full Chinese month names
+  else if (monthText.match(/^[一二三四五六七八九十]+月$/)) {
+    month = parseChineseMonth(monthText);
+  }
+  // Handle specific Chinese month names (check exact matches first)
+  else if (monthText === '十一月') month = 11;
+  else if (monthText === '十二月') month = 12;
+  else if (monthText === '十月') month = 10;
+  else if (monthText === '九月') month = 9;
+  else if (monthText === '八月') month = 8;
+  else if (monthText === '七月') month = 7;
+  else if (monthText === '六月') month = 6;
+  else if (monthText === '五月') month = 5;
+  else if (monthText === '四月') month = 4;
+  else if (monthText === '三月') month = 3;
+  else if (monthText === '二月') month = 2;
+  else if (monthText === '一月') month = 1;
+  
+  if (!month || month < 1 || month > 12) {
+    throw new Error('Invalid month format');
+  }
+  
+  return { month, year };
+}
+
+function parseChineseMonth(monthText) {
+  const chineseToNumber = {
+    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6,
+    '七': 7, '八': 8, '九': 9, '十': 10, '十一': 11, '十二': 12
+  };
+  
+  // Handle special cases for 十月, 十一月, 十二月
+  if (monthText === '十月') return 10;
+  if (monthText === '十一月') return 11;
+  if (monthText === '十二月') return 12;
+  
+  // Handle other cases
+  for (const [chinese, number] of Object.entries(chineseToNumber)) {
+    if (monthText.includes(chinese + '月')) {
+      return number;
+    }
+  }
+  
+  throw new Error('Invalid month format');
+}
+
+function getMonthName(month) {
+  const monthNames = [
+    '', '一月', '二月', '三月', '四月', '五月', '六月',
+    '七月', '八月', '九月', '十月', '十一月', '十二月'
+  ];
+  return monthNames[month] || '';
+}
+
 function isValidDate(dateString) {
   if (!dateString) return false;
   
@@ -332,7 +456,7 @@ function formatActivityForDisplay(activity) {
 }
 
 function getHelpMessage(isAuthorized = false) {
-  let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 [ID] - 查看特定活動`;
+  let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 [ID] - 查看特定活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
   if (isAuthorized) {
     message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 更新 [ID] [日期/名稱] - 更新活動\n• 刪除 [ID] - 刪除活動`;
