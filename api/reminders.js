@@ -1,7 +1,7 @@
 // Reminder scheduling endpoints
 import { ReminderService } from '../services/ReminderService.js';
 import { errorHandler } from '../middleware/errorHandler.js';
-import { validateCronApiKey, logAccessAttempt } from '../middleware/auth.js';
+import { validateCronApiKey } from '../middleware/auth.js';
 
 const reminderService = new ReminderService();
 
@@ -14,7 +14,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // Apply cron API key authentication
     return validateCronApiKey(req, res, async () => {
       const { type } = req.query;
       
@@ -42,8 +41,6 @@ async function sendMonthlyOverview(req, res) {
   try {
     const result = await reminderService.sendMonthlyOverview();
     
-    logAccessAttempt(req, 'SEND_MONTHLY_OVERVIEW', true);
-    
     return res.status(200).json({
       success: true,
       message: 'Monthly overview sent successfully',
@@ -51,14 +48,12 @@ async function sendMonthlyOverview(req, res) {
     });
   } catch (error) {
     if (error.message === 'No activities found for this month') {
-      logAccessAttempt(req, 'SEND_MONTHLY_OVERVIEW', true);
       return res.status(200).json({
         success: true,
         message: 'No activities found for this month',
         data: null
       });
     }
-    logAccessAttempt(req, 'SEND_MONTHLY_OVERVIEW', false);
     throw error;
   }
 }
@@ -67,8 +62,6 @@ async function sendWeeklyReminders(req, res) {
   try {
     const result = await reminderService.sendWeeklyReminders();
     
-    logAccessAttempt(req, 'SEND_WEEKLY_REMINDERS', true);
-    
     return res.status(200).json({
       success: true,
       message: 'Weekly reminders sent successfully',
@@ -76,14 +69,12 @@ async function sendWeeklyReminders(req, res) {
     });
   } catch (error) {
     if (error.message === 'No activities found for next week') {
-      logAccessAttempt(req, 'SEND_WEEKLY_REMINDERS', true);
       return res.status(200).json({
         success: true,
         message: 'No activities found for next week',
         data: null
       });
     }
-    logAccessAttempt(req, 'SEND_WEEKLY_REMINDERS', false);
     throw error;
   }
 }
@@ -92,8 +83,6 @@ async function sendDailyReminders(req, res) {
   try {
     const result = await reminderService.sendDailyReminders();
     
-    logAccessAttempt(req, 'SEND_DAILY_REMINDERS', true);
-    
     return res.status(200).json({
       success: true,
       message: 'Daily reminders sent successfully',
@@ -101,14 +90,12 @@ async function sendDailyReminders(req, res) {
     });
   } catch (error) {
     if (error.message === 'No activities found for tomorrow') {
-      logAccessAttempt(req, 'SEND_DAILY_REMINDERS', true);
       return res.status(200).json({
         success: true,
         message: 'No activities found for tomorrow',
         data: null
       });
     }
-    logAccessAttempt(req, 'SEND_DAILY_REMINDERS', false);
     throw error;
   }
 }

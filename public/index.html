@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Church Calendar LINE Bot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .status {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏛️ Church Calendar LINE Bot</h1>
+        <p class="status">✅ Server is running successfully!</p>
+        
+        <h2>Available API Endpoints:</h2>
+        <div class="endpoint">
+            <strong>GET /api/activities</strong> - View all activities
+        </div>
+        <div class="endpoint">
+            <strong>POST /api/activities</strong> - Create new activity (Admin only)
+        </div>
+        <div class="endpoint">
+            <strong>PUT /api/activities</strong> - Update activity (Admin only)
+        </div>
+        <div class="endpoint">
+            <strong>DELETE /api/activities</strong> - Delete activity (Admin only)
+        </div>
+        <div class="endpoint">
+            <strong>POST /api/reminders</strong> - Send reminders (Cron jobs)
+        </div>
+        <div class="endpoint">
+            <strong>POST /api/webhook</strong> - LINE Bot webhook
+        </div>
+        
+        <h2>LINE Bot Commands:</h2>
+        <ul>
+            <li><strong>help</strong> - Show help message</li>
+            <li><strong>查看 全部</strong> - View all activities</li>
+            <li><strong>查看 這個月</strong> - View current month activities</li>
+            <li><strong>查看 這個禮拜</strong> - View current week activities</li>
+            <li><strong>查看 [ID]</strong> - View specific activity</li>
+        </ul>
+        
+        <p><em>This is a serverless function project deployed on Vercel.</em></p>
+    </div>
+</body>
+</html>

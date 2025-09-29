@@ -30,24 +30,45 @@ export function validateLineUserId(req, res, next) {
 }
 
 export function validateCronApiKey(req, res, next) {
-  const apiKey = req.headers['x-api-key'] || req.query.api_key;
+  // Check multiple possible sources for API key
+  const apiKey = req.headers['x-api-key'] || 
+                 req.headers['api-key'] || 
+                 req.headers['authorization']?.replace('Bearer ', '') ||
+                 req.query.api_key ||
+                 req.query['api-key'];
+  
+  const expectedApiKey = process.env.CRON_API_KEY;
+  
+  // Debug logging
+  console.log('Cron Auth Debug:', {
+    method: req.method,
+    url: req.url,
+    hasApiKey: !!apiKey,
+    hasExpectedKey: !!expectedApiKey,
+    apiKeySource: apiKey ? 'FOUND' : 'NOT_FOUND',
+    headers: Object.keys(req.headers),
+    query: Object.keys(req.query)
+  });
   
   if (!apiKey) {
     return res.status(401).json({
       success: false,
       error: 'Unauthorized',
       message: 'API key is required for cron jobs',
-      code: 'MISSING_API_KEY'
+      code: 'MISSING_API_KEY',
+      debug: {
+        receivedHeaders: Object.keys(req.headers),
+        receivedQuery: Object.keys(req.query),
+        expectedKeySet: !!expectedApiKey
+      }
     });
   }
-  
-  const expectedApiKey = process.env.CRON_API_KEY;
   
   if (!expectedApiKey) {
     return res.status(500).json({
       success: false,
       error: 'Server Error',
-      message: 'Cron API key not configured',
+      message: 'Cron API key not configured on server',
       code: 'API_KEY_NOT_CONFIGURED'
     });
   }
@@ -57,10 +78,16 @@ export function validateCronApiKey(req, res, next) {
       success: false,
       error: 'Forbidden',
       message: 'Invalid API key',
-      code: 'INVALID_API_KEY'
+      code: 'INVALID_API_KEY',
+      debug: {
+        received: apiKey.substring(0, 10) + '...',
+        expected: expectedApiKey.substring(0, 10) + '...',
+        lengthMatch: apiKey.length === expectedApiKey.length
+      }
     });
   }
   
+  console.log('Cron authentication successful');
   next();
 }
 
@@ -100,7 +127,8 @@ export function requireAuth(req, res, next) {
 }
 
 export function getUserId(req) {
-  return req.userId || req.body?.source?.userId || req.headers['x-line-user-id'];
+  if (!req) return 'unknown';
+  return req.userId || req.body?.source?.userId || req.headers?.['x-line-user-id'] || 'unknown';
 }
 
 export function isAuthorizedUser(userId) {
@@ -117,7 +145,8 @@ export function isAuthorizedUser(userId) {
 export function logAccessAttempt(req, action, success = true) {
   const userId = getUserId(req);
   const timestamp = new Date().toISOString();
-  const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
+  const headers = req?.headers || {};
+  const ip = headers['x-forwarded-for'] || headers['x-real-ip'] || req?.connection?.remoteAddress || req?.socket?.remoteAddress || 'unknown';
   
   console.log(`[${timestamp}] Access ${success ? 'GRANTED' : 'DENIED'} - User: ${userId}, Action: ${action}, IP: ${ip}`);
 }

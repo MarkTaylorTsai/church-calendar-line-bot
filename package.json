@@ -30,13 +30,6 @@
     "line-bot",
     "reminder",
     "church",
-    "calendar",
-    "nodejs",
-    "vercel"
-  ],
-  "author": "Church Calendar Bot",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  }
+    "calendar"
+  ]
 }
