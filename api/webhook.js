@@ -108,7 +108,7 @@ async function handleMessageEvent(event) {
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
     } else if (userMessage.startsWith('add') || userMessage.startsWith('create') || userMessage.startsWith('新增')) {
       if (isAuthorized) {
-        await lineService.sendMessage(userId, 'Activity creation via LINE will be implemented soon.');
+        await handleCreateActivity(userId, userMessage);
         logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', true);
       } else {
         await lineService.sendMessage(userId, 'Sorry, you are not authorized to create activities. Contact the administrator.');
@@ -236,6 +236,43 @@ async function handleUpdateActivity(userId, userMessage) {
   }
 }
 
+async function handleCreateActivity(userId, userMessage) {
+  try {
+    // Parse command: "新增 日期 活動名稱"
+    const parts = userMessage.split(' ');
+    if (parts.length < 3) {
+      await lineService.sendMessage(userId, '格式錯誤。請使用：新增 [日期] [活動名稱]\n例如：新增 2025-01-15 主日崇拜');
+      return;
+    }
+
+    const date = parts[1];
+    const activityName = parts.slice(2).join(' ');
+
+    // Validate date format
+    if (!isValidDate(date)) {
+      await lineService.sendMessage(userId, '日期格式錯誤。請使用 YYYY-MM-DD 格式，例如：2025-01-15');
+      return;
+    }
+
+    // Create the activity
+    const newActivity = await activityService.createActivity({
+      name: activityName,
+      date: date
+    });
+
+    await lineService.sendSuccessMessage(userId, `活動已成功新增：\n${formatActivityForDisplay(newActivity)}`);
+  } catch (error) {
+    if (error.message.includes('validation') || error.message.includes('required')) {
+      await lineService.sendMessage(userId, '資料驗證錯誤：' + error.message);
+    } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
+      await lineService.sendMessage(userId, '此日期和活動名稱已存在，請使用不同的組合。');
+    } else {
+      console.error('Error creating activity:', error);
+      await lineService.sendErrorMessage(userId, '新增活動時發生錯誤，請稍後再試。');
+    }
+  }
+}
+
 async function handleDeleteActivity(userId, userMessage) {
   try {
     // Parse command: "刪除 id"
@@ -298,7 +335,7 @@ function getHelpMessage(isAuthorized = false) {
   let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 [ID] - 查看特定活動`;
   
   if (isAuthorized) {
-    message += `\n\n管理員功能：\n• 新增 - 新增活動\n• 更新 [ID] [日期/名稱] - 更新活動\n• 刪除 [ID] - 刪除活動`;
+    message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 更新 [ID] [日期/名稱] - 更新活動\n• 刪除 [ID] - 刪除活動`;
   }
   
   message += `\n\n更多功能即將推出！`;
