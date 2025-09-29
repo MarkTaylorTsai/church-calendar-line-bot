@@ -106,6 +106,9 @@ async function handleMessageEvent(event) {
     } else if (userMessage === '查看 這個禮拜' || userMessage === '查看 本週') {
       await handleViewWeeklyActivities(userId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
+    } else if (userMessage === '查看 下周' || userMessage === '查看 下個禮拜') {
+      await handleViewNextWeekActivities(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_WEEK_ACTIVITIES', true);
     } else if (userMessage === '查看 下個月') {
       await handleViewNextMonthActivities(userId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
@@ -188,11 +191,21 @@ async function handleViewMonthlyActivities(userId) {
 
 async function handleViewWeeklyActivities(userId) {
   try {
-    const activities = await activityService.getActivitiesForNextWeek();
+    const activities = await activityService.getActivitiesForThisWeek();
     await lineService.sendActivityList(userId, activities, '本週活動', false);
   } catch (error) {
     console.error('Error fetching weekly activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得本週活動，請稍後再試。');
+  }
+}
+
+async function handleViewNextWeekActivities(userId) {
+  try {
+    const activities = await activityService.getActivitiesForNextWeek();
+    await lineService.sendActivityList(userId, activities, '下周活動', false);
+  } catch (error) {
+    console.error('Error fetching next week activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得下周活動，請稍後再試。');
   }
 }
 
@@ -456,7 +469,7 @@ function formatActivityForDisplay(activity) {
 }
 
 function getHelpMessage(isAuthorized = false) {
-  let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 [ID] - 查看特定活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
+  let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [ID] - 查看特定活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
   if (isAuthorized) {
     message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 更新 [ID] [日期/名稱] - 更新活動\n• 刪除 [ID] - 刪除活動`;

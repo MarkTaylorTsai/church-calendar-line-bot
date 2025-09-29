@@ -110,6 +110,17 @@ export class ActivityService {
     }
   }
 
+  async getActivitiesForThisWeek() {
+    try {
+      const { startDate, endDate } = this.getThisWeekDateRange();
+      const activities = await this.db.getActivitiesByDateRange(startDate, endDate);
+      return activities;
+    } catch (error) {
+      console.error('Error fetching activities for this week:', error);
+      throw error;
+    }
+  }
+
   async getActivitiesForNextWeek() {
     try {
       const { startDate, endDate } = this.getNextWeekDateRange();
@@ -132,18 +143,30 @@ export class ActivityService {
     }
   }
 
+  getThisWeekDateRange() {
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay()); // Start of this week (Sunday)
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // End of this week (Saturday)
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    return { startDate: weekStart, endDate: weekEnd };
+  }
+
   getNextWeekDateRange() {
     const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
+    const nextWeekStart = new Date(today);
+    nextWeekStart.setDate(today.getDate() + (7 - today.getDay())); // Start of next week (Sunday)
+    nextWeekStart.setHours(0, 0, 0, 0);
     
-    const startDate = new Date(nextWeek);
-    startDate.setHours(0, 0, 0, 0);
+    const nextWeekEnd = new Date(nextWeekStart);
+    nextWeekEnd.setDate(nextWeekStart.getDate() + 6); // End of next week (Saturday)
+    nextWeekEnd.setHours(23, 59, 59, 999);
     
-    const endDate = new Date(nextWeek);
-    endDate.setHours(23, 59, 59, 999);
-    
-    return { startDate, endDate };
+    return { startDate: nextWeekStart, endDate: nextWeekEnd };
   }
 
   getTomorrowDateRange() {
