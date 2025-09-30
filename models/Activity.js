@@ -32,12 +32,30 @@ export class Activity {
     
     let timeRange = '';
     if (this.start_time && this.end_time) {
-      timeRange = ` ${this.start_time}-${this.end_time}`;
+      const startTime = this.formatTimeToHHMM(this.start_time);
+      const endTime = this.formatTimeToHHMM(this.end_time);
+      timeRange = ` ${startTime}-${endTime}`;
     } else if (this.start_time) {
-      timeRange = ` ${this.start_time}`;
+      timeRange = ` ${this.formatTimeToHHMM(this.start_time)}`;
     }
     
     return `${month}/${day} ${dayOfWeek}${timeRange} ${this.name}`;
+  }
+
+  formatTimeToHHMM(timeString) {
+    if (!timeString) return '';
+    
+    // If already in HH:MM format, return as is
+    if (timeString.match(/^\d{1,2}:\d{2}$/)) {
+      return timeString;
+    }
+    
+    // If in HH:MM:SS format, remove seconds
+    if (timeString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+      return timeString.substring(0, 5);
+    }
+    
+    return timeString;
   }
 
   formatDate(date) {

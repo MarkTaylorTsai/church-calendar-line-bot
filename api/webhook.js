@@ -504,12 +504,30 @@ function formatActivityForDisplay(activity) {
   
   let timeRange = '';
   if (activity.start_time && activity.end_time) {
-    timeRange = ` ${activity.start_time}-${activity.end_time}`;
+    const startTime = formatTimeToHHMM(activity.start_time);
+    const endTime = formatTimeToHHMM(activity.end_time);
+    timeRange = ` ${startTime}-${endTime}`;
   } else if (activity.start_time) {
-    timeRange = ` ${activity.start_time}`;
+    timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
   }
   
   return `ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
+}
+
+function formatTimeToHHMM(timeString) {
+  if (!timeString) return '';
+  
+  // If already in HH:MM format, return as is
+  if (timeString.match(/^\d{1,2}:\d{2}$/)) {
+    return timeString;
+  }
+  
+  // If in HH:MM:SS format, remove seconds
+  if (timeString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+    return timeString.substring(0, 5);
+  }
+  
+  return timeString;
 }
 
 function getHelpMessage(isAuthorized = false) {

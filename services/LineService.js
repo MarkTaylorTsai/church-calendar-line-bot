@@ -74,9 +74,11 @@ export class LineService {
       
       let timeRange = '';
       if (activity.start_time && activity.end_time) {
-        timeRange = ` ${activity.start_time}-${activity.end_time}`;
+        const startTime = formatTimeToHHMM(activity.start_time);
+        const endTime = formatTimeToHHMM(activity.end_time);
+        timeRange = ` ${startTime}-${endTime}`;
       } else if (activity.start_time) {
-        timeRange = ` ${activity.start_time}`;
+        timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
       }
       
       if (showIds) {
@@ -100,9 +102,11 @@ export class LineService {
     
     let timeInfo = '';
     if (activity.start_time && activity.end_time) {
-      timeInfo = `\n時間: ${activity.start_time}-${activity.end_time}`;
+      const startTime = formatTimeToHHMM(activity.start_time);
+      const endTime = formatTimeToHHMM(activity.end_time);
+      timeInfo = `\n時間: ${startTime}-${endTime}`;
     } else if (activity.start_time) {
-      timeInfo = `\n時間: ${activity.start_time}`;
+      timeInfo = `\n時間: ${formatTimeToHHMM(activity.start_time)}`;
     }
     
     const message = `活動詳情：\n\nID: ${activity.id}\n日期: ${month}/${day}/${year} ${dayOfWeek}${timeInfo}\n名稱: ${activity.name}\n建立時間: ${new Date(activity.created_at).toLocaleString('zh-TW')}`;
@@ -257,6 +261,22 @@ function getDayOfWeek(date) {
   ];
   
   return days[d.getDay()];
+}
+
+function formatTimeToHHMM(timeString) {
+  if (!timeString) return '';
+  
+  // If already in HH:MM format, return as is
+  if (timeString.match(/^\d{1,2}:\d{2}$/)) {
+    return timeString;
+  }
+  
+  // If in HH:MM:SS format, remove seconds
+  if (timeString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+    return timeString.substring(0, 5);
+  }
+  
+  return timeString;
 }
 
 function formatActivityMessage(activities, type = 'list') {
