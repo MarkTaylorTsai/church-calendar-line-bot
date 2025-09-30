@@ -82,9 +82,9 @@ export class LineService {
       }
       
       if (showIds) {
-        message += `ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+        message += `• ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       } else {
-        message += `${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       }
     });
 

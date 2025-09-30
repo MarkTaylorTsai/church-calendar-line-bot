@@ -512,7 +512,7 @@ function formatActivityForDisplay(activity, showId = false) {
   }
   
   const idPrefix = showId ? `ID: ${activity.id} | ` : '';
-  return `${idPrefix}${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
+  return `• ${idPrefix}${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
 }
 
 function formatTimeToHHMM(timeString) {

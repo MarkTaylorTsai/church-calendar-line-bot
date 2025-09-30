@@ -39,7 +39,7 @@ export class Activity {
       timeRange = ` ${this.formatTimeToHHMM(this.start_time)}`;
     }
     
-    return `${month}/${day} ${dayOfWeek}${timeRange} ${this.name}`;
+    return `• ${month}/${day} ${dayOfWeek}${timeRange} ${this.name}`;
   }
 
   formatTimeToHHMM(timeString) {
