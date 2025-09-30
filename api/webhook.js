@@ -112,6 +112,9 @@ async function handleMessageEvent(event) {
     } else if (userMessage === '查看 下個月') {
       await handleViewNextMonthActivities(userId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
+    } else if (userMessage === '查看 id' || userMessage === '查看 ID') {
+      await handleViewAllActivities(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
     } else if (userMessage.startsWith('查看 ') && (userMessage.includes('月') || userMessage.includes('Month'))) {
       await handleViewSpecificMonthActivities(userId, userMessage);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_SPECIFIC_MONTH_ACTIVITIES', true);
@@ -139,26 +142,6 @@ async function handleMessageEvent(event) {
         await lineService.sendMessage(userId, 'Sorry, you are not authorized to delete activities. Contact the administrator.');
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', false);
       }
-    } else if (userMessage === '查看 ID') {
-      // Show all activities with IDs
-      await handleViewAllActivitiesWithIds(userId);
-      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES_WITH_IDS', true);
-    } else if (userMessage.startsWith('查看 ')) {
-      // Handle specific activity view by ID
-      const parts = userMessage.split(' ');
-      if (parts.length === 2 && parts[1] && /^\d+$/.test(parts[1])) {
-        const id = parseInt(parts[1]);
-        if (id > 0) {
-          await handleViewActivityById(userId, id);
-          logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', true);
-        } else {
-          await lineService.sendMessage(userId, 'ID必須是正整數。請使用：查看 1 或 查看 2');
-          logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', false);
-        }
-      } else {
-        await lineService.sendMessage(userId, '格式錯誤。請使用：查看 [ID]\n例如：查看 1 或 查看 2');
-        logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', false);
-      }
     } else {
       await lineService.sendMessage(userId, 'Sorry, I don\'t understand that command. Type "help" for available commands.');
       logAccessAttempt({ body: { source: { userId } } }, 'UNKNOWN_COMMAND', false);
@@ -181,28 +164,19 @@ async function handleUnfollowEvent(event) {
 async function handleViewAllActivities(userId) {
   try {
     const activities = await activityService.getActivities();
-    await lineService.sendActivityList(userId, activities, '所有活動', false);
+    await lineService.sendActivityList(userId, activities, '所有活動');
   } catch (error) {
     console.error('Error fetching all activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
   }
 }
 
-async function handleViewAllActivitiesWithIds(userId) {
-  try {
-    const activities = await activityService.getActivities();
-    await lineService.sendActivityList(userId, activities, '所有活動（含ID）', true);
-  } catch (error) {
-    console.error('Error fetching all activities with IDs:', error);
-    await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
-  }
-}
 
 async function handleViewMonthlyActivities(userId) {
   try {
     const { month, year } = getCurrentMonthAndYear();
     const activities = await activityService.getActivitiesForMonth(month, year);
-    await lineService.sendActivityList(userId, activities, '本月活動', false);
+    await lineService.sendActivityList(userId, activities, '本月活動');
   } catch (error) {
     console.error('Error fetching monthly activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得本月活動，請稍後再試。');
@@ -212,7 +186,7 @@ async function handleViewMonthlyActivities(userId) {
 async function handleViewWeeklyActivities(userId) {
   try {
     const activities = await activityService.getActivitiesForThisWeek();
-    await lineService.sendActivityList(userId, activities, '本週活動', false);
+    await lineService.sendActivityList(userId, activities, '本週活動');
   } catch (error) {
     console.error('Error fetching weekly activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得本週活動，請稍後再試。');
@@ -222,7 +196,7 @@ async function handleViewWeeklyActivities(userId) {
 async function handleViewNextWeekActivities(userId) {
   try {
     const activities = await activityService.getActivitiesForNextWeek();
-    await lineService.sendActivityList(userId, activities, '下周活動', false);
+    await lineService.sendActivityList(userId, activities, '下周活動');
   } catch (error) {
     console.error('Error fetching next week activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得下周活動，請稍後再試。');
@@ -233,7 +207,7 @@ async function handleViewNextMonthActivities(userId) {
   try {
     const { month, year } = getNextMonthAndYear();
     const activities = await activityService.getActivitiesForMonth(month, year);
-    await lineService.sendActivityList(userId, activities, '下個月活動', false);
+    await lineService.sendActivityList(userId, activities, '下個月活動');
   } catch (error) {
     console.error('Error fetching next month activities:', error);
     await lineService.sendErrorMessage(userId, '無法取得下個月活動，請稍後再試。');
@@ -245,7 +219,7 @@ async function handleViewSpecificMonthActivities(userId, userMessage) {
     const { month, year } = parseMonthFromMessage(userMessage);
     const activities = await activityService.getActivitiesForMonth(month, year);
     const monthName = getMonthName(month);
-    await lineService.sendActivityList(userId, activities, `${year}年${monthName}活動`, false);
+    await lineService.sendActivityList(userId, activities, `${year}年${monthName}活動`);
   } catch (error) {
     if (error.message === 'Invalid month format') {
       await lineService.sendMessage(userId, '月份格式錯誤。請使用：查看 11月 或 查看 十一月');
@@ -256,19 +230,6 @@ async function handleViewSpecificMonthActivities(userId, userMessage) {
   }
 }
 
-async function handleViewActivityById(userId, activityId) {
-  try {
-    const activity = await activityService.getActivityById(activityId);
-    await lineService.sendActivityDetails(userId, activity);
-  } catch (error) {
-    if (error.message === 'Activity not found') {
-      await lineService.sendMessage(userId, `找不到 ID 為 ${activityId} 的活動。`);
-    } else {
-      console.error('Error fetching activity by ID:', error);
-      await lineService.sendErrorMessage(userId, '無法取得活動詳情，請稍後再試。');
-    }
-  }
-}
 
 async function handleUpdateActivity(userId, userMessage) {
   try {
@@ -291,7 +252,7 @@ async function handleUpdateActivity(userId, userMessage) {
     }
 
     const updatedActivity = await activityService.updateActivity(activityId, updateData);
-    await lineService.sendSuccessMessage(userId, `活動已成功更新：\n${formatActivityForDisplay(updatedActivity, true)}`);
+    await lineService.sendSuccessMessage(userId, `活動已成功更新：\n${formatActivityForDisplay(updatedActivity)}`);
   } catch (error) {
     if (error.message === 'Activity not found') {
       await lineService.sendMessage(userId, '找不到指定的活動。');
@@ -358,7 +319,7 @@ async function handleCreateActivity(userId, userMessage) {
 
     const newActivity = await activityService.createActivity(activityData);
 
-    await lineService.sendSuccessMessage(userId, `活動已成功新增：\n${formatActivityForDisplay(newActivity, true)}`);
+    await lineService.sendSuccessMessage(userId, `活動已成功新增：\n${formatActivityForDisplay(newActivity)}`);
   } catch (error) {
     if (error.message.includes('validation') || error.message.includes('required')) {
       await lineService.sendMessage(userId, '資料驗證錯誤：' + error.message);
@@ -386,7 +347,7 @@ async function handleDeleteActivity(userId, userMessage) {
     const activity = await activityService.getActivityById(activityId);
     await activityService.deleteActivity(activityId);
     
-    await lineService.sendSuccessMessage(userId, `活動已成功刪除：\n${formatActivityForDisplay(activity, true)}`);
+    await lineService.sendSuccessMessage(userId, `活動已成功刪除：\n${formatActivityForDisplay(activity)}`);
   } catch (error) {
     if (error.message === 'Activity not found') {
       await lineService.sendMessage(userId, '找不到指定的活動。');
@@ -515,7 +476,7 @@ function isValidTime(timeString) {
   return timeRegex.test(timeString);
 }
 
-function formatActivityForDisplay(activity, showId = false) {
+function formatActivityForDisplay(activity) {
   const date = new Date(activity.date);
   const month = date.getMonth() + 1;
   const day = date.getDate();
@@ -531,8 +492,7 @@ function formatActivityForDisplay(activity, showId = false) {
     timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
   }
   
-  const idPrefix = showId ? `ID: ${activity.id} | ` : '';
-  return `• ${idPrefix}${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
+  return `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
 }
 
 function formatTimeToHHMM(timeString) {
@@ -552,7 +512,7 @@ function formatTimeToHHMM(timeString) {
 }
 
 function getHelpMessage(isAuthorized = false) {
-  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 ID - 查看所有活動（含ID）\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [ID] - 查看特定活動（顯示ID）\n• 查看 [月份] - 查看指定月份活動\n\nID格式範例：\n• 查看 ID - 查看所有活動並顯示ID\n• 查看 1 - 查看ID為1的活動\n• 查看 2 - 查看ID為2的活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
+  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 id - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
   if (isAuthorized) {
     message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 新增 [日期] [開始時間-結束時間] [活動名稱] - 新增帶時間的活動\n• 更新 [ID] [日期/名稱/時間] - 更新活動\n• 刪除 [ID] - 刪除活動\n\n時間格式範例：\n• 新增 2025-01-15 主日崇拜\n• 新增 2025-01-15 09:00-11:00 主日崇拜`;

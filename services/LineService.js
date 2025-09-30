@@ -59,7 +59,7 @@ export class LineService {
     return await this.sendMessage(userId, helpMessage);
   }
 
-  async sendActivityList(userId, activities, title = '活動列表', showIds = false) {
+  async sendActivityList(userId, activities, title = '活動列表') {
     if (!activities || activities.length === 0) {
       const message = `目前沒有${title}安排。`;
       return await this.sendMessage(userId, message);
@@ -81,11 +81,7 @@ export class LineService {
         timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
       }
       
-      if (showIds) {
-        message += `• ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
-      } else {
-        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
-      }
+      message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
     });
 
     return await this.sendMessage(userId, message.trim());
