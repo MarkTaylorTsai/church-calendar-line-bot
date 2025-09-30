@@ -139,14 +139,24 @@ async function handleMessageEvent(event) {
         await lineService.sendMessage(userId, 'Sorry, you are not authorized to delete activities. Contact the administrator.');
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', false);
       }
+    } else if (userMessage === '查看 ID') {
+      // Show all activities with IDs
+      await handleViewAllActivitiesWithIds(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES_WITH_IDS', true);
     } else if (userMessage.startsWith('查看 ')) {
       // Handle specific activity view by ID
       const parts = userMessage.split(' ');
-      if (parts.length === 2 && !isNaN(parts[1])) {
-        await handleViewActivityById(userId, parseInt(parts[1]));
-        logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', true);
+      if (parts.length === 2 && parts[1] && /^\d+$/.test(parts[1])) {
+        const id = parseInt(parts[1]);
+        if (id > 0) {
+          await handleViewActivityById(userId, id);
+          logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', true);
+        } else {
+          await lineService.sendMessage(userId, 'ID必須是正整數。請使用：查看 1 或 查看 2');
+          logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', false);
+        }
       } else {
-        await lineService.sendMessage(userId, 'Invalid format. Use "查看 [ID]" to view a specific activity.');
+        await lineService.sendMessage(userId, '格式錯誤。請使用：查看 [ID]\n例如：查看 1 或 查看 2');
         logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ACTIVITY_BY_ID', false);
       }
     } else {
@@ -174,6 +184,16 @@ async function handleViewAllActivities(userId) {
     await lineService.sendActivityList(userId, activities, '所有活動', false);
   } catch (error) {
     console.error('Error fetching all activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
+  }
+}
+
+async function handleViewAllActivitiesWithIds(userId) {
+  try {
+    const activities = await activityService.getActivities();
+    await lineService.sendActivityList(userId, activities, '所有活動（含ID）', true);
+  } catch (error) {
+    console.error('Error fetching all activities with IDs:', error);
     await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
   }
 }
@@ -532,7 +552,7 @@ function formatTimeToHHMM(timeString) {
 }
 
 function getHelpMessage(isAuthorized = false) {
-  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [ID] - 查看特定活動（顯示ID）\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
+  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 ID - 查看所有活動（含ID）\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [ID] - 查看特定活動（顯示ID）\n• 查看 [月份] - 查看指定月份活動\n\nID格式範例：\n• 查看 ID - 查看所有活動並顯示ID\n• 查看 1 - 查看ID為1的活動\n• 查看 2 - 查看ID為2的活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
   if (isAuthorized) {
     message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 新增 [日期] [開始時間-結束時間] [活動名稱] - 新增帶時間的活動\n• 更新 [ID] [日期/名稱/時間] - 更新活動\n• 刪除 [ID] - 刪除活動\n\n時間格式範例：\n• 新增 2025-01-15 主日崇拜\n• 新增 2025-01-15 09:00-11:00 主日崇拜`;
