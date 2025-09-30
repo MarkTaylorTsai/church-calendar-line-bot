@@ -6,6 +6,8 @@ export class Activity {
     this.id = data.id;
     this.name = data.name;
     this.date = data.date;
+    this.start_time = data.start_time;
+    this.end_time = data.end_time;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
   }
@@ -15,15 +17,27 @@ export class Activity {
       id: this.id,
       name: this.name,
       date: this.date,
+      start_time: this.start_time,
+      end_time: this.end_time,
       created_at: this.created_at,
       updated_at: this.updated_at
     };
   }
 
   formatForDisplay() {
-    const formattedDate = formatDate(this.date);
+    const date = new Date(this.date);
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
     const dayOfWeek = getDayOfWeek(this.date);
-    return `${formattedDate} ${dayOfWeek} ${this.name}`;
+    
+    let timeRange = '';
+    if (this.start_time && this.end_time) {
+      timeRange = ` ${this.start_time}-${this.end_time}`;
+    } else if (this.start_time) {
+      timeRange = ` ${this.start_time}`;
+    }
+    
+    return `${month}/${day} ${dayOfWeek}${timeRange} ${this.name}`;
   }
 
   formatDate(date) {

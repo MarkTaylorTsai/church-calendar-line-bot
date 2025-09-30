@@ -284,15 +284,31 @@ async function handleUpdateActivity(userId, userMessage) {
 
 async function handleCreateActivity(userId, userMessage) {
   try {
-    // Parse command: "新增 日期 活動名稱"
+    // Parse command: "新增 日期 [時間] 活動名稱"
+    // Support formats: "新增 2025-01-15 主日崇拜" or "新增 2025-01-15 09:00-11:00 主日崇拜"
     const parts = userMessage.split(' ');
     if (parts.length < 3) {
-      await lineService.sendMessage(userId, '格式錯誤。請使用：新增 [日期] [活動名稱]\n例如：新增 2025-01-15 主日崇拜');
+      await lineService.sendMessage(userId, '格式錯誤。請使用：\n• 新增 [日期] [活動名稱]\n• 新增 [日期] [開始時間-結束時間] [活動名稱]\n例如：新增 2025-01-15 主日崇拜\n例如：新增 2025-01-15 09:00-11:00 主日崇拜');
       return;
     }
 
     const date = parts[1];
-    const activityName = parts.slice(2).join(' ');
+    let activityName, startTime, endTime;
+
+    // Check if the third part contains time (HH:MM-HH:MM format)
+    if (parts[2] && parts[2].includes('-') && parts[2].includes(':')) {
+      const timeRange = parts[2];
+      const timeParts = timeRange.split('-');
+      if (timeParts.length === 2) {
+        startTime = timeParts[0];
+        endTime = timeParts[1];
+        activityName = parts.slice(3).join(' ');
+      } else {
+        activityName = parts.slice(2).join(' ');
+      }
+    } else {
+      activityName = parts.slice(2).join(' ');
+    }
 
     // Validate date format
     if (!isValidDate(date)) {
@@ -300,11 +316,27 @@ async function handleCreateActivity(userId, userMessage) {
       return;
     }
 
+    // Validate time format if provided
+    if (startTime && !isValidTime(startTime)) {
+      await lineService.sendMessage(userId, '開始時間格式錯誤。請使用 HH:MM 格式，例如：09:00');
+      return;
+    }
+
+    if (endTime && !isValidTime(endTime)) {
+      await lineService.sendMessage(userId, '結束時間格式錯誤。請使用 HH:MM 格式，例如：11:00');
+      return;
+    }
+
     // Create the activity
-    const newActivity = await activityService.createActivity({
+    const activityData = {
       name: activityName,
       date: date
-    });
+    };
+
+    if (startTime) activityData.start_time = startTime;
+    if (endTime) activityData.end_time = endTime;
+
+    const newActivity = await activityService.createActivity(activityData);
 
     await lineService.sendSuccessMessage(userId, `活動已成功新增：\n${formatActivityForDisplay(newActivity)}`);
   } catch (error) {
@@ -455,24 +487,36 @@ function isValidDate(dateString) {
   return !isNaN(date.getTime()) && date.toISOString().split('T')[0] === dateString;
 }
 
+function isValidTime(timeString) {
+  if (!timeString) return false;
+  
+  // Accept HH:MM or HH:MM:SS format
+  const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+  return timeRegex.test(timeString);
+}
+
 function formatActivityForDisplay(activity) {
   const date = new Date(activity.date);
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const year = date.getFullYear();
-  const formattedDate = `${month}-${day}-${year}`;
-  
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
   const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
   const dayOfWeek = days[date.getDay()];
   
-  return `ID: ${activity.id} | ${formattedDate} ${dayOfWeek} ${activity.name}`;
+  let timeRange = '';
+  if (activity.start_time && activity.end_time) {
+    timeRange = ` ${activity.start_time}-${activity.end_time}`;
+  } else if (activity.start_time) {
+    timeRange = ` ${activity.start_time}`;
+  }
+  
+  return `ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
 }
 
 function getHelpMessage(isAuthorized = false) {
   let message = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [ID] - 查看特定活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
   if (isAuthorized) {
-    message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 更新 [ID] [日期/名稱] - 更新活動\n• 刪除 [ID] - 刪除活動`;
+    message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 新增 [日期] [開始時間-結束時間] [活動名稱] - 新增帶時間的活動\n• 更新 [ID] [日期/名稱/時間] - 更新活動\n• 刪除 [ID] - 刪除活動\n\n時間格式範例：\n• 新增 2025-01-15 主日崇拜\n• 新增 2025-01-15 09:00-11:00 主日崇拜`;
   }
   
   message += `\n\n更多功能即將推出！`;

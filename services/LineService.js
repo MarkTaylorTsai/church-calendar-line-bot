@@ -67,13 +67,22 @@ export class LineService {
 
     let message = `${title}：\n`;
     activities.forEach(activity => {
-      const formattedDate = formatDate(activity.date);
+      const date = new Date(activity.date);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
       const dayOfWeek = getDayOfWeek(activity.date);
       
+      let timeRange = '';
+      if (activity.start_time && activity.end_time) {
+        timeRange = ` ${activity.start_time}-${activity.end_time}`;
+      } else if (activity.start_time) {
+        timeRange = ` ${activity.start_time}`;
+      }
+      
       if (showIds) {
-        message += `ID: ${activity.id} | ${formattedDate} ${dayOfWeek} ${activity.name}\n`;
+        message += `ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       } else {
-        message += `${formattedDate} ${dayOfWeek} ${activity.name}\n`;
+        message += `${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       }
     });
 
@@ -82,15 +91,21 @@ export class LineService {
 
   async sendActivityDetails(userId, activity) {
     const date = new Date(activity.date);
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
     const year = date.getFullYear();
-    const formattedDate = `${month}-${day}-${year}`;
     
     const days = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
     const dayOfWeek = days[date.getDay()];
     
-    const message = `活動詳情：\n\nID: ${activity.id}\n日期: ${formattedDate} ${dayOfWeek}\n名稱: ${activity.name}\n建立時間: ${new Date(activity.created_at).toLocaleString('zh-TW')}`;
+    let timeInfo = '';
+    if (activity.start_time && activity.end_time) {
+      timeInfo = `\n時間: ${activity.start_time}-${activity.end_time}`;
+    } else if (activity.start_time) {
+      timeInfo = `\n時間: ${activity.start_time}`;
+    }
+    
+    const message = `活動詳情：\n\nID: ${activity.id}\n日期: ${month}/${day}/${year} ${dayOfWeek}${timeInfo}\n名稱: ${activity.name}\n建立時間: ${new Date(activity.created_at).toLocaleString('zh-TW')}`;
     
     return await this.sendMessage(userId, message);
   }
