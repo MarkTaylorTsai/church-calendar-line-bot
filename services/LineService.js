@@ -48,7 +48,7 @@ export class LineService {
   }
 
   async sendWelcomeMessage(userId) {
-    const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
+    const welcomeMessage = `歡迎使用教會行事曆助理！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
     
     return await this.sendMessage(userId, welcomeMessage);
   }
