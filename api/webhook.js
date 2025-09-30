@@ -113,8 +113,8 @@ async function handleMessageEvent(event) {
       await handleViewNextMonthActivities(userId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
     } else if (userMessage === '查看 id' || userMessage === '查看 ID') {
-      await handleViewAllActivities(userId);
-      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
+      await handleViewAllActivitiesWithIds(userId);
+      logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES_WITH_IDS', true);
     } else if (userMessage.startsWith('查看 ') && (userMessage.includes('月') || userMessage.includes('Month'))) {
       await handleViewSpecificMonthActivities(userId, userMessage);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_SPECIFIC_MONTH_ACTIVITIES', true);
@@ -167,6 +167,16 @@ async function handleViewAllActivities(userId) {
     await lineService.sendActivityList(userId, activities, '所有活動');
   } catch (error) {
     console.error('Error fetching all activities:', error);
+    await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
+  }
+}
+
+async function handleViewAllActivitiesWithIds(userId) {
+  try {
+    const activities = await activityService.getActivities();
+    await lineService.sendActivityListWithIds(userId, activities, '所有活動（含ID）');
+  } catch (error) {
+    console.error('Error fetching all activities with IDs:', error);
     await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
   }
 }
@@ -512,7 +522,7 @@ function formatTimeToHHMM(timeString) {
 }
 
 function getHelpMessage(isAuthorized = false) {
-  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 id - 查看所有活動\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
+  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 id - 查看所有活動（含ID）\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
   if (isAuthorized) {
     message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 新增 [日期] [開始時間-結束時間] [活動名稱] - 新增帶時間的活動\n• 更新 [ID] [日期/名稱/時間] - 更新活動\n• 刪除 [ID] - 刪除活動\n\n時間格式範例：\n• 新增 2025-01-15 主日崇拜\n• 新增 2025-01-15 09:00-11:00 主日崇拜`;

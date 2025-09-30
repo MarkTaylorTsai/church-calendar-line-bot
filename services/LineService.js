@@ -87,6 +87,34 @@ export class LineService {
     return await this.sendMessage(userId, message.trim());
   }
 
+  async sendActivityListWithIds(userId, activities, title = '活動列表') {
+    if (!activities || activities.length === 0) {
+      const message = `目前沒有${title}安排。`;
+      return await this.sendMessage(userId, message);
+    }
+
+    let message = `${title}：\n`;
+    activities.forEach(activity => {
+      const date = new Date(activity.date);
+      const month = date.getMonth() + 1;
+      const day = date.getDate();
+      const dayOfWeek = getDayOfWeek(activity.date);
+      
+      let timeRange = '';
+      if (activity.start_time && activity.end_time) {
+        const startTime = formatTimeToHHMM(activity.start_time);
+        const endTime = formatTimeToHHMM(activity.end_time);
+        timeRange = ` ${startTime}-${endTime}`;
+      } else if (activity.start_time) {
+        timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+      }
+      
+      message += `• ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+    });
+
+    return await this.sendMessage(userId, message.trim());
+  }
+
   async sendActivityDetails(userId, activity) {
     const date = new Date(activity.date);
     const month = date.getMonth() + 1;
