@@ -243,22 +243,57 @@ async function handleViewSpecificMonthActivities(userId, userMessage) {
 
 async function handleUpdateActivity(userId, userMessage) {
   try {
-    // Parse command: "更新 id 日期/名稱"
+    // Parse command: "更新 id [名稱/時間/日期] [value]"
     const parts = userMessage.split(' ');
-    if (parts.length < 3) {
-      await lineService.sendMessage(userId, '格式錯誤。請使用：更新 [ID] [日期/名稱]\n例如：更新 1 2025-10-15 或 更新 1 新的活動名稱');
+    if (parts.length < 4) {
+      await lineService.sendMessage(userId, '格式錯誤。請使用：\n• 更新 [ID] 名稱 [新名稱]\n• 更新 [ID] 時間 [開始時間-結束時間]\n• 更新 [ID] 日期 [YYYY-MM-DD]\n例如：更新 17 名稱 教導站桌遊活動');
       return;
     }
 
     const activityId = parseInt(parts[1]);
-    const updateValue = parts.slice(2).join(' ');
+    const updateType = parts[2];
+    const updateValue = parts.slice(3).join(' ');
 
-    // Determine if it's a date or name update
     let updateData = {};
-    if (isValidDate(updateValue)) {
+
+    if (updateType === '名稱') {
+      updateData.name = updateValue;
+    } else if (updateType === '時間') {
+      // Parse time range format like "22:00-24:00"
+      const timeRange = updateValue.split('-');
+      if (timeRange.length !== 2) {
+        await lineService.sendMessage(userId, '時間格式錯誤。請使用：開始時間-結束時間\n例如：22:00-24:00');
+        return;
+      }
+      
+      const startTime = timeRange[0].trim();
+      const endTime = timeRange[1].trim();
+      
+      // Validate time format (accept 24:00 as end time)
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      const endTimeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^24:00$/;
+      if (!timeRegex.test(startTime) || !endTimeRegex.test(endTime)) {
+        await lineService.sendMessage(userId, '時間格式錯誤。請使用 HH:MM 格式\n例如：22:00-24:00');
+        return;
+      }
+      
+      // Check if start time is before end time
+      if (startTime >= endTime) {
+        await lineService.sendMessage(userId, '開始時間必須早於結束時間。');
+        return;
+      }
+      
+      updateData.start_time = startTime;
+      updateData.end_time = endTime;
+    } else if (updateType === '日期') {
+      if (!isValidDate(updateValue)) {
+        await lineService.sendMessage(userId, '日期格式錯誤。請使用 YYYY-MM-DD 格式\n例如：2025-10-15');
+        return;
+      }
       updateData.date = updateValue;
     } else {
-      updateData.name = updateValue;
+      await lineService.sendMessage(userId, '更新類型錯誤。請使用：名稱、時間 或 日期\n例如：更新 17 名稱 教導站桌遊活動');
+      return;
     }
 
     const updatedActivity = await activityService.updateActivity(activityId, updateData);
