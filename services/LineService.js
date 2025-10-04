@@ -30,6 +30,23 @@ export class LineService {
     }
   }
 
+  async sendReplyMessage(replyToken, message) {
+    // Validate message
+    const messageErrors = validateLineMessage(message);
+    if (messageErrors.length > 0) {
+      throw createValidationError(messageErrors.join(', '));
+    }
+
+    try {
+      const result = await this.lineApi.sendReplyMessage(replyToken, message);
+      console.log(`Reply message sent successfully`);
+      return result;
+    } catch (error) {
+      console.error('Error sending reply message:', error);
+      throw error;
+    }
+  }
+
   async sendBroadcastMessage(message) {
     // Validate message
     const messageErrors = validateLineMessage(message);

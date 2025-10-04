@@ -85,7 +85,26 @@ async function processEvent(event) {
 
 async function handleMessageEvent(event) {
   const message = event.message;
-  const userId = event.source.userId;
+  
+  // Handle different source types (user, group, room)
+  let userId, sourceType, sourceId;
+  
+  if (event.source.type === 'user') {
+    userId = event.source.userId;
+    sourceType = 'user';
+    sourceId = userId;
+  } else if (event.source.type === 'group') {
+    userId = event.source.userId; // User who sent the message in the group
+    sourceType = 'group';
+    sourceId = event.source.groupId;
+  } else if (event.source.type === 'room') {
+    userId = event.source.userId; // User who sent the message in the room
+    sourceType = 'room';
+    sourceId = event.source.roomId;
+  } else {
+    console.log('Unknown source type:', event.source.type);
+    return; // Skip processing unknown source types
+  }
   
   // Check if user is authorized for CRUD operations
   const isAuthorized = isAuthorizedUser(userId);
@@ -95,55 +114,55 @@ async function handleMessageEvent(event) {
     
     // Handle different commands
     if (userMessage === 'help' || userMessage === '幫助') {
-      await lineService.sendMessage(userId, getHelpMessage(isAuthorized));
+      await sendResponseMessage(event, getHelpMessage(isAuthorized), sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'HELP_COMMAND', true);
     } else if (userMessage === 'list' || userMessage === '列表' || userMessage === '查看 全部') {
-      await handleViewAllActivities(userId);
+      await handleViewAllActivities(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
     } else if (userMessage === '查看 這個月' || userMessage === '查看 本月') {
-      await handleViewMonthlyActivities(userId);
+      await handleViewMonthlyActivities(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_MONTHLY_ACTIVITIES', true);
     } else if (userMessage === '查看 這個禮拜' || userMessage === '查看 本週') {
-      await handleViewWeeklyActivities(userId);
+      await handleViewWeeklyActivities(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
     } else if (userMessage === '查看 下周' || userMessage === '查看 下個禮拜') {
-      await handleViewNextWeekActivities(userId);
+      await handleViewNextWeekActivities(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_WEEK_ACTIVITIES', true);
     } else if (userMessage === '查看 下個月') {
-      await handleViewNextMonthActivities(userId);
+      await handleViewNextMonthActivities(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
     } else if (userMessage === '查看 id' || userMessage === '查看 ID') {
-      await handleViewAllActivitiesWithIds(userId);
+      await handleViewAllActivitiesWithIds(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES_WITH_IDS', true);
     } else if (userMessage.startsWith('查看 ') && (userMessage.includes('月') || userMessage.includes('Month'))) {
-      await handleViewSpecificMonthActivities(userId, userMessage);
+      await handleViewSpecificMonthActivities(event, sourceType, sourceId, userMessage);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_SPECIFIC_MONTH_ACTIVITIES', true);
     } else if (userMessage.startsWith('add') || userMessage.startsWith('create') || userMessage.startsWith('新增')) {
       if (isAuthorized) {
-        await handleCreateActivity(userId, userMessage);
+        await handleCreateActivity(event, sourceType, sourceId, userMessage);
         logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', true);
       } else {
-        await lineService.sendMessage(userId, 'Sorry, you are not authorized to create activities. Contact the administrator.');
+        await sendResponseMessage(event, 'Sorry, you are not authorized to create activities. Contact the administrator.', sourceType, sourceId);
         logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', false);
       }
     } else if (userMessage.startsWith('更新 ')) {
       if (isAuthorized) {
-        await handleUpdateActivity(userId, userMessage);
+        await handleUpdateActivity(event, sourceType, sourceId, userMessage);
         logAccessAttempt({ body: { source: { userId } } }, 'UPDATE_COMMAND', true);
       } else {
-        await lineService.sendMessage(userId, 'Sorry, you are not authorized to update activities. Contact the administrator.');
+        await sendResponseMessage(event, 'Sorry, you are not authorized to update activities. Contact the administrator.', sourceType, sourceId);
         logAccessAttempt({ body: { source: { userId } } }, 'UPDATE_COMMAND', false);
       }
     } else if (userMessage.startsWith('刪除 ')) {
       if (isAuthorized) {
-        await handleDeleteActivity(userId, userMessage);
+        await handleDeleteActivity(event, sourceType, sourceId, userMessage);
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', true);
       } else {
-        await lineService.sendMessage(userId, 'Sorry, you are not authorized to delete activities. Contact the administrator.');
+        await sendResponseMessage(event, 'Sorry, you are not authorized to delete activities. Contact the administrator.', sourceType, sourceId);
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', false);
       }
     } else {
-      await lineService.sendMessage(userId, 'Sorry, I don\'t understand that command. Type "help" for available commands.');
+      await sendResponseMessage(event, 'Sorry, I don\'t understand that command. Type "help" for available commands.', sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'UNKNOWN_COMMAND', false);
     }
   }
@@ -161,92 +180,270 @@ async function handleUnfollowEvent(event) {
   console.log('User unfollowed:', event.source.userId);
 }
 
-async function handleViewAllActivities(userId) {
+// Helper function to send messages to different source types
+async function sendResponseMessage(event, message, sourceType, sourceId) {
+  try {
+    if (sourceType === 'user') {
+      // For direct messages, use the regular sendMessage method
+      await lineService.sendMessage(sourceId, message);
+    } else {
+      // For group/room messages, use replyToken to reply in the same chat
+      await lineService.sendReplyMessage(event.replyToken, message);
+    }
+  } catch (error) {
+    console.error('Error sending response message:', error);
+    // Fallback: try to send as direct message to the user
+    if (sourceType !== 'user') {
+      try {
+        await lineService.sendMessage(event.source.userId, message);
+      } catch (fallbackError) {
+        console.error('Error sending fallback message:', fallbackError);
+      }
+    }
+  }
+}
+
+async function handleViewAllActivities(event, sourceType, sourceId) {
   try {
     const activities = await activityService.getActivities();
-    await lineService.sendActivityList(userId, activities, '所有活動');
+    if (activities && activities.length > 0) {
+      let message = '所有活動：\n';
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, '目前沒有活動安排。', sourceType, sourceId);
+    }
   } catch (error) {
     console.error('Error fetching all activities:', error);
-    await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
+    await sendResponseMessage(event, '無法取得活動列表，請稍後再試。', sourceType, sourceId);
   }
 }
 
-async function handleViewAllActivitiesWithIds(userId) {
+async function handleViewAllActivitiesWithIds(event, sourceType, sourceId) {
   try {
     const activities = await activityService.getActivities();
-    await lineService.sendActivityListWithIds(userId, activities, '所有活動（含ID）');
+    if (activities && activities.length > 0) {
+      let message = '所有活動（含ID）：\n';
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, '目前沒有活動安排。', sourceType, sourceId);
+    }
   } catch (error) {
     console.error('Error fetching all activities with IDs:', error);
-    await lineService.sendErrorMessage(userId, '無法取得活動列表，請稍後再試。');
+    await sendResponseMessage(event, '無法取得活動列表，請稍後再試。', sourceType, sourceId);
   }
 }
 
 
-async function handleViewMonthlyActivities(userId) {
+async function handleViewMonthlyActivities(event, sourceType, sourceId) {
   try {
     const { month, year } = getCurrentMonthAndYear();
     const activities = await activityService.getActivitiesForMonth(month, year);
-    await lineService.sendActivityList(userId, activities, '本月活動');
+    if (activities && activities.length > 0) {
+      let message = '本月活動：\n';
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, '目前沒有本月活動安排。', sourceType, sourceId);
+    }
   } catch (error) {
     console.error('Error fetching monthly activities:', error);
-    await lineService.sendErrorMessage(userId, '無法取得本月活動，請稍後再試。');
+    await sendResponseMessage(event, '無法取得本月活動，請稍後再試。', sourceType, sourceId);
   }
 }
 
-async function handleViewWeeklyActivities(userId) {
+async function handleViewWeeklyActivities(event, sourceType, sourceId) {
   try {
     const activities = await activityService.getActivitiesForThisWeek();
-    await lineService.sendActivityList(userId, activities, '本週活動');
+    if (activities && activities.length > 0) {
+      let message = '本週活動：\n';
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, '目前沒有本週活動安排。', sourceType, sourceId);
+    }
   } catch (error) {
     console.error('Error fetching weekly activities:', error);
-    await lineService.sendErrorMessage(userId, '無法取得本週活動，請稍後再試。');
+    await sendResponseMessage(event, '無法取得本週活動，請稍後再試。', sourceType, sourceId);
   }
 }
 
-async function handleViewNextWeekActivities(userId) {
+async function handleViewNextWeekActivities(event, sourceType, sourceId) {
   try {
     const activities = await activityService.getActivitiesForNextWeek();
-    await lineService.sendActivityList(userId, activities, '下周活動');
+    if (activities && activities.length > 0) {
+      let message = '下周活動：\n';
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, '目前沒有下周活動安排。', sourceType, sourceId);
+    }
   } catch (error) {
     console.error('Error fetching next week activities:', error);
-    await lineService.sendErrorMessage(userId, '無法取得下周活動，請稍後再試。');
+    await sendResponseMessage(event, '無法取得下周活動，請稍後再試。', sourceType, sourceId);
   }
 }
 
-async function handleViewNextMonthActivities(userId) {
+async function handleViewNextMonthActivities(event, sourceType, sourceId) {
   try {
     const { month, year } = getNextMonthAndYear();
     const activities = await activityService.getActivitiesForMonth(month, year);
-    await lineService.sendActivityList(userId, activities, '下個月活動');
+    if (activities && activities.length > 0) {
+      let message = '下個月活動：\n';
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, '目前沒有下個月活動安排。', sourceType, sourceId);
+    }
   } catch (error) {
     console.error('Error fetching next month activities:', error);
-    await lineService.sendErrorMessage(userId, '無法取得下個月活動，請稍後再試。');
+    await sendResponseMessage(event, '無法取得下個月活動，請稍後再試。', sourceType, sourceId);
   }
 }
 
-async function handleViewSpecificMonthActivities(userId, userMessage) {
+async function handleViewSpecificMonthActivities(event, sourceType, sourceId, userMessage) {
   try {
     const { month, year } = parseMonthFromMessage(userMessage);
     const activities = await activityService.getActivitiesForMonth(month, year);
     const monthName = getMonthName(month);
-    await lineService.sendActivityList(userId, activities, `${year}年${monthName}活動`);
+    
+    if (activities && activities.length > 0) {
+      let message = `${year}年${monthName}活動：\n`;
+      activities.forEach(activity => {
+        const date = new Date(activity.date);
+        const month = date.getMonth() + 1;
+        const day = date.getDate();
+        const dayOfWeek = getDayOfWeek(activity.date);
+        
+        let timeRange = '';
+        if (activity.start_time && activity.end_time) {
+          const startTime = formatTimeToHHMM(activity.start_time);
+          const endTime = formatTimeToHHMM(activity.end_time);
+          timeRange = ` ${startTime}-${endTime}`;
+        } else if (activity.start_time) {
+          timeRange = ` ${formatTimeToHHMM(activity.start_time)}`;
+        }
+        
+        message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
+      });
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+    } else {
+      await sendResponseMessage(event, `目前沒有${year}年${monthName}活動安排。`, sourceType, sourceId);
+    }
   } catch (error) {
     if (error.message === 'Invalid month format') {
-      await lineService.sendMessage(userId, '月份格式錯誤。請使用：查看 11月 或 查看 十一月');
+      await sendResponseMessage(event, '月份格式錯誤。請使用：查看 11月 或 查看 十一月', sourceType, sourceId);
     } else {
       console.error('Error fetching specific month activities:', error);
-      await lineService.sendErrorMessage(userId, '無法取得指定月份活動，請稍後再試。');
+      await sendResponseMessage(event, '無法取得指定月份活動，請稍後再試。', sourceType, sourceId);
     }
   }
 }
 
 
-async function handleUpdateActivity(userId, userMessage) {
+async function handleUpdateActivity(event, sourceType, sourceId, userMessage) {
   try {
     // Parse command: "更新 id [名稱/時間/日期] [value]"
     const parts = userMessage.split(' ');
     if (parts.length < 4) {
-      await lineService.sendMessage(userId, '格式錯誤。請使用：\n• 更新 [ID] 名稱 [新名稱]\n• 更新 [ID] 時間 [開始時間-結束時間]\n• 更新 [ID] 日期 [YYYY-MM-DD]\n例如：更新 17 名稱 教導站桌遊活動');
+      await sendResponseMessage(event, '格式錯誤。請使用：\n• 更新 [ID] 名稱 [新名稱]\n• 更新 [ID] 時間 [開始時間-結束時間]\n• 更新 [ID] 日期 [YYYY-MM-DD]\n例如：更新 17 名稱 教導站桌遊活動', sourceType, sourceId);
       return;
     }
 
@@ -262,7 +459,7 @@ async function handleUpdateActivity(userId, userMessage) {
       // Parse time range format like "22:00-24:00"
       const timeRange = updateValue.split('-');
       if (timeRange.length !== 2) {
-        await lineService.sendMessage(userId, '時間格式錯誤。請使用：開始時間-結束時間\n例如：22:00-24:00');
+        await sendResponseMessage(event, '時間格式錯誤。請使用：開始時間-結束時間\n例如：22:00-24:00', sourceType, sourceId);
         return;
       }
       
@@ -273,13 +470,13 @@ async function handleUpdateActivity(userId, userMessage) {
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       const endTimeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^24:00$/;
       if (!timeRegex.test(startTime) || !endTimeRegex.test(endTime)) {
-        await lineService.sendMessage(userId, '時間格式錯誤。請使用 HH:MM 格式\n例如：22:00-24:00');
+        await sendResponseMessage(event, '時間格式錯誤。請使用 HH:MM 格式\n例如：22:00-24:00', sourceType, sourceId);
         return;
       }
       
       // Check if start time is before end time
       if (startTime >= endTime) {
-        await lineService.sendMessage(userId, '開始時間必須早於結束時間。');
+        await sendResponseMessage(event, '開始時間必須早於結束時間。', sourceType, sourceId);
         return;
       }
       
@@ -287,34 +484,34 @@ async function handleUpdateActivity(userId, userMessage) {
       updateData.end_time = endTime;
     } else if (updateType === '日期') {
       if (!isValidDate(updateValue)) {
-        await lineService.sendMessage(userId, '日期格式錯誤。請使用 YYYY-MM-DD 格式\n例如：2025-10-15');
+        await sendResponseMessage(event, '日期格式錯誤。請使用 YYYY-MM-DD 格式\n例如：2025-10-15', sourceType, sourceId);
         return;
       }
       updateData.date = updateValue;
     } else {
-      await lineService.sendMessage(userId, '更新類型錯誤。請使用：名稱、時間 或 日期\n例如：更新 17 名稱 教導站桌遊活動');
+      await sendResponseMessage(event, '更新類型錯誤。請使用：名稱、時間 或 日期\n例如：更新 17 名稱 教導站桌遊活動', sourceType, sourceId);
       return;
     }
 
     const updatedActivity = await activityService.updateActivity(activityId, updateData);
-    await lineService.sendSuccessMessage(userId, `活動已成功更新：\n${formatActivityForDisplay(updatedActivity)}`);
+    await sendResponseMessage(event, `✅ 活動已成功更新：\n${formatActivityForDisplay(updatedActivity)}`, sourceType, sourceId);
   } catch (error) {
     if (error.message === 'Activity not found') {
-      await lineService.sendMessage(userId, '找不到指定的活動。');
+      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId);
     } else {
       console.error('Error updating activity:', error);
-      await lineService.sendErrorMessage(userId, '更新活動時發生錯誤，請稍後再試。');
+      await sendResponseMessage(event, '更新活動時發生錯誤，請稍後再試。', sourceType, sourceId);
     }
   }
 }
 
-async function handleCreateActivity(userId, userMessage) {
+async function handleCreateActivity(event, sourceType, sourceId, userMessage) {
   try {
     // Parse command: "新增 日期 [時間] 活動名稱"
     // Support formats: "新增 2025-01-15 主日崇拜" or "新增 2025-01-15 09:00-11:00 主日崇拜"
     const parts = userMessage.split(' ');
     if (parts.length < 3) {
-      await lineService.sendMessage(userId, '格式錯誤。請使用：\n• 新增 [日期] [活動名稱]\n• 新增 [日期] [開始時間-結束時間] [活動名稱]\n例如：新增 2025-01-15 主日崇拜\n例如：新增 2025-01-15 09:00-11:00 主日崇拜');
+      await sendResponseMessage(event, '格式錯誤。請使用：\n• 新增 [日期] [活動名稱]\n• 新增 [日期] [開始時間-結束時間] [活動名稱]\n例如：新增 2025-01-15 主日崇拜\n例如：新增 2025-01-15 09:00-11:00 主日崇拜', sourceType, sourceId);
       return;
     }
 
@@ -338,18 +535,18 @@ async function handleCreateActivity(userId, userMessage) {
 
     // Validate date format
     if (!isValidDate(date)) {
-      await lineService.sendMessage(userId, '日期格式錯誤。請使用 YYYY-MM-DD 格式，例如：2025-01-15');
+      await sendResponseMessage(event, '日期格式錯誤。請使用 YYYY-MM-DD 格式，例如：2025-01-15', sourceType, sourceId);
       return;
     }
 
     // Validate time format if provided
     if (startTime && !isValidTime(startTime)) {
-      await lineService.sendMessage(userId, '開始時間格式錯誤。請使用 HH:MM 格式，例如：09:00');
+      await sendResponseMessage(event, '開始時間格式錯誤。請使用 HH:MM 格式，例如：09:00', sourceType, sourceId);
       return;
     }
 
     if (endTime && !isValidTime(endTime)) {
-      await lineService.sendMessage(userId, '結束時間格式錯誤。請使用 HH:MM 格式，例如：11:00');
+      await sendResponseMessage(event, '結束時間格式錯誤。請使用 HH:MM 格式，例如：11:00', sourceType, sourceId);
       return;
     }
 
@@ -364,25 +561,25 @@ async function handleCreateActivity(userId, userMessage) {
 
     const newActivity = await activityService.createActivity(activityData);
 
-    await lineService.sendSuccessMessage(userId, `活動已成功新增：\n${formatActivityForDisplay(newActivity)}`);
+    await sendResponseMessage(event, `✅ 活動已成功新增：\n${formatActivityForDisplay(newActivity)}`, sourceType, sourceId);
   } catch (error) {
     if (error.message.includes('validation') || error.message.includes('required')) {
-      await lineService.sendMessage(userId, '資料驗證錯誤：' + error.message);
+      await sendResponseMessage(event, '資料驗證錯誤：' + error.message, sourceType, sourceId);
     } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
-      await lineService.sendMessage(userId, '此日期和活動名稱已存在，請使用不同的組合。');
+      await sendResponseMessage(event, '此日期和活動名稱已存在，請使用不同的組合。', sourceType, sourceId);
     } else {
       console.error('Error creating activity:', error);
-      await lineService.sendErrorMessage(userId, '新增活動時發生錯誤，請稍後再試。');
+      await sendResponseMessage(event, '新增活動時發生錯誤，請稍後再試。', sourceType, sourceId);
     }
   }
 }
 
-async function handleDeleteActivity(userId, userMessage) {
+async function handleDeleteActivity(event, sourceType, sourceId, userMessage) {
   try {
     // Parse command: "刪除 id"
     const parts = userMessage.split(' ');
     if (parts.length !== 2) {
-      await lineService.sendMessage(userId, '格式錯誤。請使用：刪除 [ID]\n例如：刪除 1');
+      await sendResponseMessage(event, '格式錯誤。請使用：刪除 [ID]\n例如：刪除 1', sourceType, sourceId);
       return;
     }
 
@@ -392,13 +589,13 @@ async function handleDeleteActivity(userId, userMessage) {
     const activity = await activityService.getActivityById(activityId);
     await activityService.deleteActivity(activityId);
     
-    await lineService.sendSuccessMessage(userId, `活動已成功刪除：\n${formatActivityForDisplay(activity)}`);
+    await sendResponseMessage(event, `✅ 活動已成功刪除：\n${formatActivityForDisplay(activity)}`, sourceType, sourceId);
   } catch (error) {
     if (error.message === 'Activity not found') {
-      await lineService.sendMessage(userId, '找不到指定的活動。');
+      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId);
     } else {
       console.error('Error deleting activity:', error);
-      await lineService.sendErrorMessage(userId, '刪除活動時發生錯誤，請稍後再試。');
+      await sendResponseMessage(event, '刪除活動時發生錯誤，請稍後再試。', sourceType, sourceId);
     }
   }
 }
@@ -538,6 +735,35 @@ function formatActivityForDisplay(activity) {
   }
   
   return `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}`;
+}
+
+function formatTimeToHHMM(timeString) {
+  if (!timeString) return '';
+  
+  // If already in HH:MM format, return as is
+  if (timeString.match(/^\d{1,2}:\d{2}$/)) {
+    return timeString;
+  }
+  
+  // If in HH:MM:SS format, remove seconds
+  if (timeString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+    return timeString.substring(0, 5);
+  }
+  
+  return timeString;
+}
+
+// Helper functions for date/time formatting
+function getDayOfWeek(date) {
+  if (!date) return '';
+  
+  const d = new Date(date);
+  const days = [
+    '星期日', '星期一', '星期二', '星期三', 
+    '星期四', '星期五', '星期六'
+  ];
+  
+  return days[d.getDay()];
 }
 
 function formatTimeToHHMM(timeString) {
