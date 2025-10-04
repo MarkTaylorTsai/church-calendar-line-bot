@@ -954,22 +954,6 @@ function getDayOfWeek(date) {
   return days[d.getDay()];
 }
 
-function formatTimeToHHMM(timeString) {
-  if (!timeString) return '';
-  
-  // If already in HH:MM format, return as is
-  if (timeString.match(/^\d{1,2}:\d{2}$/)) {
-    return timeString;
-  }
-  
-  // If in HH:MM:SS format, remove seconds
-  if (timeString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
-    return timeString.substring(0, 5);
-  }
-  
-  return timeString;
-}
-
 function getHelpMessage(isAuthorized = false) {
   let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 id - 查看所有活動（含ID）\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
   
