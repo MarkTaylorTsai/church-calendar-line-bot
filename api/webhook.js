@@ -1,24 +1,138 @@
-// LINE webhook handler
-import { LineService } from '../services/LineService.js';
-import { ActivityService } from '../services/ActivityService.js';
-import { errorHandler } from '../middleware/errorHandler.js';
-import { isAuthorizedUser, logAccessAttempt } from '../middleware/auth.js';
-
-const lineService = new LineService();
-const activityService = new ActivityService();
-
+// LINE webhook handler with enhanced error logging
 export default async function handler(req, res) {
+  console.log('=== WEBHOOK DEBUG START ===');
+  console.log('Request method:', req.method);
+  console.log('Request headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  
   try {
+    // Check environment variables first
+    const envCheck = {
+      SUPABASE_URL: process.env.SUPABASE_URL ? 'SET' : 'NOT_SET',
+      SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ? 'SET' : 'NOT_SET',
+      LINE_CHANNEL_ACCESS_TOKEN: process.env.LINE_CHANNEL_ACCESS_TOKEN ? 'SET' : 'NOT_SET',
+      LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET ? 'SET' : 'NOT_SET'
+    };
+    console.log('Environment variables:', envCheck);
+    
     if (req.method !== 'POST') {
+      console.log('Method not allowed:', req.method);
       return res.status(405).json({ 
         error: 'Method not allowed',
         message: 'Only POST method is supported for webhook'
       });
     }
     
+    // Check for missing environment variables
+    const missingEnvVars = [];
+    if (!process.env.SUPABASE_URL) missingEnvVars.push('SUPABASE_URL');
+    if (!process.env.SUPABASE_ANON_KEY) missingEnvVars.push('SUPABASE_ANON_KEY');
+    if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) missingEnvVars.push('LINE_CHANNEL_ACCESS_TOKEN');
+    if (!process.env.LINE_CHANNEL_SECRET) missingEnvVars.push('LINE_CHANNEL_SECRET');
+    
+    if (missingEnvVars.length > 0) {
+      console.error('Missing environment variables:', missingEnvVars);
+      return res.status(500).json({
+        error: 'Configuration Error',
+        message: 'Missing required environment variables',
+        missing: missingEnvVars
+      });
+    }
+    
+    // Try to import services with error handling
+    let LineService, ActivityService, errorHandler, isAuthorizedUser, logAccessAttempt;
+    
+    try {
+      console.log('Importing LineService...');
+      const lineServiceModule = await import('../services/LineService.js');
+      LineService = lineServiceModule.LineService;
+      console.log('LineService imported successfully');
+    } catch (importError) {
+      console.error('Error importing LineService:', importError);
+      return res.status(500).json({
+        error: 'Import Error',
+        message: 'Failed to import LineService',
+        details: importError.message
+      });
+    }
+    
+    try {
+      console.log('Importing ActivityService...');
+      const activityServiceModule = await import('../services/ActivityService.js');
+      ActivityService = activityServiceModule.ActivityService;
+      console.log('ActivityService imported successfully');
+    } catch (importError) {
+      console.error('Error importing ActivityService:', importError);
+      return res.status(500).json({
+        error: 'Import Error',
+        message: 'Failed to import ActivityService',
+        details: importError.message
+      });
+    }
+    
+    try {
+      console.log('Importing errorHandler...');
+      const errorHandlerModule = await import('../middleware/errorHandler.js');
+      errorHandler = errorHandlerModule.errorHandler;
+      console.log('errorHandler imported successfully');
+    } catch (importError) {
+      console.error('Error importing errorHandler:', importError);
+      return res.status(500).json({
+        error: 'Import Error',
+        message: 'Failed to import errorHandler',
+        details: importError.message
+      });
+    }
+    
+    try {
+      console.log('Importing auth middleware...');
+      const authModule = await import('../middleware/auth.js');
+      isAuthorizedUser = authModule.isAuthorizedUser;
+      logAccessAttempt = authModule.logAccessAttempt;
+      console.log('Auth middleware imported successfully');
+    } catch (importError) {
+      console.error('Error importing auth middleware:', importError);
+      return res.status(500).json({
+        error: 'Import Error',
+        message: 'Failed to import auth middleware',
+        details: importError.message
+      });
+    }
+    
+    // Initialize services
+    let lineService, activityService;
+    try {
+      console.log('Initializing LineService...');
+      lineService = new LineService();
+      console.log('LineService initialized successfully');
+    } catch (initError) {
+      console.error('Error initializing LineService:', initError);
+      return res.status(500).json({
+        error: 'Initialization Error',
+        message: 'Failed to initialize LineService',
+        details: initError.message
+      });
+    }
+    
+    try {
+      console.log('Initializing ActivityService...');
+      activityService = new ActivityService();
+      console.log('ActivityService initialized successfully');
+    } catch (initError) {
+      console.error('Error initializing ActivityService:', initError);
+      return res.status(500).json({
+        error: 'Initialization Error',
+        message: 'Failed to initialize ActivityService',
+        details: initError.message
+      });
+    }
+    
     // Verify LINE webhook signature
     const signature = req.headers['x-line-signature'];
+    console.log('LINE signature header:', signature ? 'PRESENT' : 'MISSING');
+    
     if (!signature) {
+      console.log('Missing LINE signature header');
       return res.status(401).json({
         error: 'Unauthorized',
         message: 'Missing LINE signature header',
@@ -26,26 +140,63 @@ export default async function handler(req, res) {
       });
     }
     
-    const isValid = lineService.verifyWebhook(signature, JSON.stringify(req.body));
-    if (!isValid) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Invalid LINE signature',
-        code: 'INVALID_SIGNATURE'
+    try {
+      console.log('Verifying webhook signature...');
+      const isValid = lineService.verifyWebhook(signature, JSON.stringify(req.body));
+      console.log('Signature verification result:', isValid);
+      
+      if (!isValid) {
+        console.log('Invalid LINE signature');
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Invalid LINE signature',
+          code: 'INVALID_SIGNATURE'
+        });
+      }
+    } catch (verifyError) {
+      console.error('Error verifying webhook signature:', verifyError);
+      return res.status(500).json({
+        error: 'Verification Error',
+        message: 'Failed to verify webhook signature',
+        details: verifyError.message
       });
     }
     
+    console.log('All checks passed, processing webhook...');
     // Handle LINE webhook events
-    return await handleLineWebhook(req, res);
+    return await handleLineWebhook(req, res, lineService, activityService, isAuthorizedUser, logAccessAttempt);
   } catch (error) {
-    return errorHandler(error, req, res);
+    console.error('=== WEBHOOK ERROR ===');
+    console.error('Error type:', error.constructor.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('=== WEBHOOK ERROR END ===');
+    
+    // Try to use errorHandler if available, otherwise return basic error
+    try {
+      if (typeof errorHandler === 'function') {
+        return errorHandler(error, req, res);
+      }
+    } catch (handlerError) {
+      console.error('Error in errorHandler:', handlerError);
+    }
+    
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: error.message,
+      type: error.constructor.name,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 
-async function handleLineWebhook(req, res) {
+async function handleLineWebhook(req, res, lineService, activityService, isAuthorizedUser, logAccessAttempt) {
+  console.log('=== HANDLING LINE WEBHOOK ===');
   const events = req.body.events;
+  console.log('Events received:', events ? events.length : 'null');
   
   if (!events || events.length === 0) {
+    console.log('No events to process');
     return res.status(200).json({
       success: true,
       message: 'No events to process'
@@ -54,26 +205,29 @@ async function handleLineWebhook(req, res) {
   
   for (const event of events) {
     try {
-      await processEvent(event);
+      console.log('Processing event:', event.type);
+      await processEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt);
     } catch (error) {
       console.error('Error processing event:', error);
       // Continue processing other events even if one fails
     }
   }
   
+  console.log('All events processed successfully');
   return res.status(200).json({
     success: true,
     message: 'Webhook events processed'
   });
 }
 
-async function processEvent(event) {
+async function processEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt) {
+  console.log('Processing event type:', event.type);
   switch (event.type) {
     case 'message':
-      await handleMessageEvent(event);
+      await handleMessageEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt);
       break;
     case 'follow':
-      await handleFollowEvent(event);
+      await handleFollowEvent(event, lineService);
       break;
     case 'unfollow':
       await handleUnfollowEvent(event);
@@ -83,7 +237,7 @@ async function processEvent(event) {
   }
 }
 
-async function handleMessageEvent(event) {
+async function handleMessageEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt) {
   console.log('Processing message event:', JSON.stringify(event, null, 2));
   const message = event.message;
   
@@ -121,70 +275,76 @@ async function handleMessageEvent(event) {
     // Handle different commands
     if (userMessage === 'help' || userMessage === '幫助') {
       console.log('Handling help command');
-      await sendResponseMessage(event, getHelpMessage(isAuthorized), sourceType, sourceId);
+      await sendResponseMessage(event, getHelpMessage(isAuthorized), sourceType, sourceId, lineService);
       logAccessAttempt({ body: { source: { userId } } }, 'HELP_COMMAND', true);
     } else if (userMessage === 'test') {
       console.log('Handling test command');
-      await sendResponseMessage(event, 'Test message received! Bot is working.', sourceType, sourceId);
+      await sendResponseMessage(event, 'Test message received! Bot is working.', sourceType, sourceId, lineService);
       logAccessAttempt({ body: { source: { userId } } }, 'TEST_COMMAND', true);
     } else if (userMessage === 'list' || userMessage === '列表' || userMessage === '查看 全部') {
-      await handleViewAllActivities(event, sourceType, sourceId);
+      await handleViewAllActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
     } else if (userMessage === '查看 這個月' || userMessage === '查看 本月') {
-      await handleViewMonthlyActivities(event, sourceType, sourceId);
+      await handleViewMonthlyActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_MONTHLY_ACTIVITIES', true);
     } else if (userMessage === '查看 這個禮拜' || userMessage === '查看 本週') {
-      await handleViewWeeklyActivities(event, sourceType, sourceId);
+      await handleViewWeeklyActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
     } else if (userMessage === '查看 下周' || userMessage === '查看 下個禮拜') {
-      await handleViewNextWeekActivities(event, sourceType, sourceId);
+      await handleViewNextWeekActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_WEEK_ACTIVITIES', true);
     } else if (userMessage === '查看 下個月') {
-      await handleViewNextMonthActivities(event, sourceType, sourceId);
+      await handleViewNextMonthActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
     } else if (userMessage === '查看 id' || userMessage === '查看 ID') {
-      await handleViewAllActivitiesWithIds(event, sourceType, sourceId);
+      await handleViewAllActivitiesWithIds(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES_WITH_IDS', true);
     } else if (userMessage.startsWith('查看 ') && (userMessage.includes('月') || userMessage.includes('Month'))) {
-      await handleViewSpecificMonthActivities(event, sourceType, sourceId, userMessage);
+      await handleViewSpecificMonthActivities(event, sourceType, sourceId, userMessage, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_SPECIFIC_MONTH_ACTIVITIES', true);
     } else if (userMessage.startsWith('add') || userMessage.startsWith('create') || userMessage.startsWith('新增')) {
       if (isAuthorized) {
-        await handleCreateActivity(event, sourceType, sourceId, userMessage);
+        await handleCreateActivity(event, sourceType, sourceId, userMessage, lineService, activityService);
         logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', true);
       } else {
-        await sendResponseMessage(event, 'Sorry, you are not authorized to create activities. Contact the administrator.', sourceType, sourceId);
+        await sendResponseMessage(event, 'Sorry, you are not authorized to create activities. Contact the administrator.', sourceType, sourceId, lineService);
         logAccessAttempt({ body: { source: { userId } } }, 'CREATE_COMMAND', false);
       }
     } else if (userMessage.startsWith('更新 ')) {
       if (isAuthorized) {
-        await handleUpdateActivity(event, sourceType, sourceId, userMessage);
+        await handleUpdateActivity(event, sourceType, sourceId, userMessage, lineService, activityService);
         logAccessAttempt({ body: { source: { userId } } }, 'UPDATE_COMMAND', true);
       } else {
-        await sendResponseMessage(event, 'Sorry, you are not authorized to update activities. Contact the administrator.', sourceType, sourceId);
+        await sendResponseMessage(event, 'Sorry, you are not authorized to update activities. Contact the administrator.', sourceType, sourceId, lineService);
         logAccessAttempt({ body: { source: { userId } } }, 'UPDATE_COMMAND', false);
       }
     } else if (userMessage.startsWith('刪除 ')) {
       if (isAuthorized) {
-        await handleDeleteActivity(event, sourceType, sourceId, userMessage);
+        await handleDeleteActivity(event, sourceType, sourceId, userMessage, lineService, activityService);
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', true);
       } else {
-        await sendResponseMessage(event, 'Sorry, you are not authorized to delete activities. Contact the administrator.', sourceType, sourceId);
+        await sendResponseMessage(event, 'Sorry, you are not authorized to delete activities. Contact the administrator.', sourceType, sourceId, lineService);
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', false);
       }
     } else {
       console.log('Unknown command received:', userMessage);
-      await sendResponseMessage(event, 'Sorry, I don\'t understand that command. Type "help" for available commands.', sourceType, sourceId);
+      await sendResponseMessage(event, 'Sorry, I don\'t understand that command. Type "help" for available commands.', sourceType, sourceId, lineService);
       logAccessAttempt({ body: { source: { userId } } }, 'UNKNOWN_COMMAND', false);
     }
   }
 }
 
-async function handleFollowEvent(event) {
+async function handleFollowEvent(event, lineService) {
+  console.log('Handling follow event for user:', event.source.userId);
   const userId = event.source.userId;
   const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
   
-  await lineService.sendMessage(userId, welcomeMessage);
+  try {
+    await lineService.sendMessage(userId, welcomeMessage);
+    console.log('Welcome message sent successfully');
+  } catch (error) {
+    console.error('Error sending welcome message:', error);
+  }
 }
 
 async function handleUnfollowEvent(event) {
@@ -193,7 +353,7 @@ async function handleUnfollowEvent(event) {
 }
 
 // Helper function to send messages to different source types
-async function sendResponseMessage(event, message, sourceType, sourceId) {
+async function sendResponseMessage(event, message, sourceType, sourceId, lineService) {
   console.log(`Attempting to send message. SourceType: ${sourceType}, SourceId: ${sourceId}, ReplyToken: ${event.replyToken}`);
   
   try {
@@ -228,9 +388,12 @@ async function sendResponseMessage(event, message, sourceType, sourceId) {
   }
 }
 
-async function handleViewAllActivities(event, sourceType, sourceId) {
+async function handleViewAllActivities(event, sourceType, sourceId, lineService, activityService) {
   try {
+    console.log('Fetching all activities...');
     const activities = await activityService.getActivities();
+    console.log('Activities found:', activities ? activities.length : 0);
+    
     if (activities && activities.length > 0) {
       let message = '所有活動：\n';
       activities.forEach(activity => {
@@ -250,13 +413,13 @@ async function handleViewAllActivities(event, sourceType, sourceId) {
         
         message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, '目前沒有活動安排。', sourceType, sourceId);
+      await sendResponseMessage(event, '目前沒有活動安排。', sourceType, sourceId, lineService);
     }
   } catch (error) {
     console.error('Error fetching all activities:', error);
-    await sendResponseMessage(event, '無法取得活動列表，請稍後再試。', sourceType, sourceId);
+    await sendResponseMessage(event, '無法取得活動列表，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 
