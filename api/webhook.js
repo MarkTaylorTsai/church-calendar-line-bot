@@ -84,6 +84,7 @@ async function processEvent(event) {
 }
 
 async function handleMessageEvent(event) {
+  console.log('Processing message event:', JSON.stringify(event, null, 2));
   const message = event.message;
   
   // Handle different source types (user, group, room)
@@ -93,14 +94,17 @@ async function handleMessageEvent(event) {
     userId = event.source.userId;
     sourceType = 'user';
     sourceId = userId;
+    console.log('Direct message from user:', userId);
   } else if (event.source.type === 'group') {
     userId = event.source.userId; // User who sent the message in the group
     sourceType = 'group';
     sourceId = event.source.groupId;
+    console.log('Group message from user:', userId, 'in group:', sourceId);
   } else if (event.source.type === 'room') {
     userId = event.source.userId; // User who sent the message in the room
     sourceType = 'room';
     sourceId = event.source.roomId;
+    console.log('Room message from user:', userId, 'in room:', sourceId);
   } else {
     console.log('Unknown source type:', event.source.type);
     return; // Skip processing unknown source types
@@ -108,14 +112,21 @@ async function handleMessageEvent(event) {
   
   // Check if user is authorized for CRUD operations
   const isAuthorized = isAuthorizedUser(userId);
+  console.log('User authorized:', isAuthorized);
   
   if (message.type === 'text') {
     const userMessage = message.text.toLowerCase().trim();
+    console.log('Processing text message:', userMessage);
     
     // Handle different commands
     if (userMessage === 'help' || userMessage === '幫助') {
+      console.log('Handling help command');
       await sendResponseMessage(event, getHelpMessage(isAuthorized), sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'HELP_COMMAND', true);
+    } else if (userMessage === 'test') {
+      console.log('Handling test command');
+      await sendResponseMessage(event, 'Test message received! Bot is working.', sourceType, sourceId);
+      logAccessAttempt({ body: { source: { userId } } }, 'TEST_COMMAND', true);
     } else if (userMessage === 'list' || userMessage === '列表' || userMessage === '查看 全部') {
       await handleViewAllActivities(event, sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
@@ -162,6 +173,7 @@ async function handleMessageEvent(event) {
         logAccessAttempt({ body: { source: { userId } } }, 'DELETE_COMMAND', false);
       }
     } else {
+      console.log('Unknown command received:', userMessage);
       await sendResponseMessage(event, 'Sorry, I don\'t understand that command. Type "help" for available commands.', sourceType, sourceId);
       logAccessAttempt({ body: { source: { userId } } }, 'UNKNOWN_COMMAND', false);
     }
@@ -182,24 +194,37 @@ async function handleUnfollowEvent(event) {
 
 // Helper function to send messages to different source types
 async function sendResponseMessage(event, message, sourceType, sourceId) {
+  console.log(`Attempting to send message. SourceType: ${sourceType}, SourceId: ${sourceId}, ReplyToken: ${event.replyToken}`);
+  
   try {
     if (sourceType === 'user') {
       // For direct messages, use the regular sendMessage method
+      console.log('Sending direct message to user:', sourceId);
       await lineService.sendMessage(sourceId, message);
+      console.log('Direct message sent successfully');
     } else {
-      // For group/room messages, use replyToken to reply in the same chat
-      await lineService.sendReplyMessage(event.replyToken, message);
+      // For group/room messages, try reply first, then fallback to direct message
+      if (event.replyToken) {
+        try {
+          console.log('Sending reply message with token:', event.replyToken);
+          await lineService.sendReplyMessage(event.replyToken, message);
+          console.log('Reply message sent successfully');
+          return;
+        } catch (replyError) {
+          console.error('Reply message failed, trying direct message fallback:', replyError);
+        }
+      } else {
+        console.log('No reply token available, using direct message');
+      }
+      
+      // Fallback to direct message
+      console.log('Sending fallback direct message to user:', event.source.userId);
+      await lineService.sendMessage(event.source.userId, message);
+      console.log('Fallback direct message sent successfully');
     }
   } catch (error) {
-    console.error('Error sending response message:', error);
-    // Fallback: try to send as direct message to the user
-    if (sourceType !== 'user') {
-      try {
-        await lineService.sendMessage(event.source.userId, message);
-      } catch (fallbackError) {
-        console.error('Error sending fallback message:', fallbackError);
-      }
-    }
+    console.error('All message sending methods failed:', error);
+    throw error;
   }
 }
 
