@@ -423,7 +423,7 @@ async function handleViewAllActivities(event, sourceType, sourceId, lineService,
   }
 }
 
-async function handleViewAllActivitiesWithIds(event, sourceType, sourceId) {
+async function handleViewAllActivitiesWithIds(event, sourceType, sourceId, lineService, activityService) {
   try {
     const activities = await activityService.getActivities();
     if (activities && activities.length > 0) {
@@ -445,18 +445,18 @@ async function handleViewAllActivitiesWithIds(event, sourceType, sourceId) {
         
         message += `• ID: ${activity.id} | ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, '目前沒有活動安排。', sourceType, sourceId);
+      await sendResponseMessage(event, '目前沒有活動安排。', sourceType, sourceId, lineService);
     }
   } catch (error) {
     console.error('Error fetching all activities with IDs:', error);
-    await sendResponseMessage(event, '無法取得活動列表，請稍後再試。', sourceType, sourceId);
+    await sendResponseMessage(event, '無法取得活動列表，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 
 
-async function handleViewMonthlyActivities(event, sourceType, sourceId) {
+async function handleViewMonthlyActivities(event, sourceType, sourceId, lineService, activityService) {
   try {
     const { month, year } = getCurrentMonthAndYear();
     const activities = await activityService.getActivitiesForMonth(month, year);
@@ -479,17 +479,17 @@ async function handleViewMonthlyActivities(event, sourceType, sourceId) {
         
         message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, '目前沒有本月活動安排。', sourceType, sourceId);
+      await sendResponseMessage(event, '目前沒有本月活動安排。', sourceType, sourceId, lineService);
     }
   } catch (error) {
     console.error('Error fetching monthly activities:', error);
-    await sendResponseMessage(event, '無法取得本月活動，請稍後再試。', sourceType, sourceId);
+    await sendResponseMessage(event, '無法取得本月活動，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 
-async function handleViewWeeklyActivities(event, sourceType, sourceId) {
+async function handleViewWeeklyActivities(event, sourceType, sourceId, lineService, activityService) {
   try {
     const activities = await activityService.getActivitiesForThisWeek();
     if (activities && activities.length > 0) {
@@ -511,17 +511,17 @@ async function handleViewWeeklyActivities(event, sourceType, sourceId) {
         
         message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, '目前沒有本週活動安排。', sourceType, sourceId);
+      await sendResponseMessage(event, '目前沒有本週活動安排。', sourceType, sourceId, lineService);
     }
   } catch (error) {
     console.error('Error fetching weekly activities:', error);
-    await sendResponseMessage(event, '無法取得本週活動，請稍後再試。', sourceType, sourceId);
+    await sendResponseMessage(event, '無法取得本週活動，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 
-async function handleViewNextWeekActivities(event, sourceType, sourceId) {
+async function handleViewNextWeekActivities(event, sourceType, sourceId, lineService, activityService) {
   try {
     const activities = await activityService.getActivitiesForNextWeek();
     if (activities && activities.length > 0) {
@@ -543,17 +543,17 @@ async function handleViewNextWeekActivities(event, sourceType, sourceId) {
         
         message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, '目前沒有下周活動安排。', sourceType, sourceId);
+      await sendResponseMessage(event, '目前沒有下周活動安排。', sourceType, sourceId, lineService);
     }
   } catch (error) {
     console.error('Error fetching next week activities:', error);
-    await sendResponseMessage(event, '無法取得下周活動，請稍後再試。', sourceType, sourceId);
+    await sendResponseMessage(event, '無法取得下周活動，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 
-async function handleViewNextMonthActivities(event, sourceType, sourceId) {
+async function handleViewNextMonthActivities(event, sourceType, sourceId, lineService, activityService) {
   try {
     const { month, year } = getNextMonthAndYear();
     const activities = await activityService.getActivitiesForMonth(month, year);
@@ -576,17 +576,17 @@ async function handleViewNextMonthActivities(event, sourceType, sourceId) {
         
         message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, '目前沒有下個月活動安排。', sourceType, sourceId);
+      await sendResponseMessage(event, '目前沒有下個月活動安排。', sourceType, sourceId, lineService);
     }
   } catch (error) {
     console.error('Error fetching next month activities:', error);
-    await sendResponseMessage(event, '無法取得下個月活動，請稍後再試。', sourceType, sourceId);
+    await sendResponseMessage(event, '無法取得下個月活動，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 
-async function handleViewSpecificMonthActivities(event, sourceType, sourceId, userMessage) {
+async function handleViewSpecificMonthActivities(event, sourceType, sourceId, userMessage, lineService, activityService) {
   try {
     const { month, year } = parseMonthFromMessage(userMessage);
     const activities = await activityService.getActivitiesForMonth(month, year);
@@ -611,27 +611,27 @@ async function handleViewSpecificMonthActivities(event, sourceType, sourceId, us
         
         message += `• ${month}/${day} ${dayOfWeek}${timeRange} ${activity.name}\n`;
       });
-      await sendResponseMessage(event, message.trim(), sourceType, sourceId);
+      await sendResponseMessage(event, message.trim(), sourceType, sourceId, lineService);
     } else {
-      await sendResponseMessage(event, `目前沒有${year}年${monthName}活動安排。`, sourceType, sourceId);
+      await sendResponseMessage(event, `目前沒有${year}年${monthName}活動安排。`, sourceType, sourceId, lineService);
     }
   } catch (error) {
     if (error.message === 'Invalid month format') {
-      await sendResponseMessage(event, '月份格式錯誤。請使用：查看 11月 或 查看 十一月', sourceType, sourceId);
+      await sendResponseMessage(event, '月份格式錯誤。請使用：查看 11月 或 查看 十一月', sourceType, sourceId, lineService);
     } else {
       console.error('Error fetching specific month activities:', error);
-      await sendResponseMessage(event, '無法取得指定月份活動，請稍後再試。', sourceType, sourceId);
+      await sendResponseMessage(event, '無法取得指定月份活動，請稍後再試。', sourceType, sourceId, lineService);
     }
   }
 }
 
 
-async function handleUpdateActivity(event, sourceType, sourceId, userMessage) {
+async function handleUpdateActivity(event, sourceType, sourceId, userMessage, lineService, activityService) {
   try {
     // Parse command: "更新 id [名稱/時間/日期] [value]"
     const parts = userMessage.split(' ');
     if (parts.length < 4) {
-      await sendResponseMessage(event, '格式錯誤。請使用：\n• 更新 [ID] 名稱 [新名稱]\n• 更新 [ID] 時間 [開始時間-結束時間]\n• 更新 [ID] 日期 [YYYY-MM-DD]\n例如：更新 17 名稱 教導站桌遊活動', sourceType, sourceId);
+      await sendResponseMessage(event, '格式錯誤。請使用：\n• 更新 [ID] 名稱 [新名稱]\n• 更新 [ID] 時間 [開始時間-結束時間]\n• 更新 [ID] 日期 [YYYY-MM-DD]\n例如：更新 17 名稱 教導站桌遊活動', sourceType, sourceId, lineService);
       return;
     }
 
@@ -647,7 +647,7 @@ async function handleUpdateActivity(event, sourceType, sourceId, userMessage) {
       // Parse time range format like "22:00-24:00"
       const timeRange = updateValue.split('-');
       if (timeRange.length !== 2) {
-        await sendResponseMessage(event, '時間格式錯誤。請使用：開始時間-結束時間\n例如：22:00-24:00', sourceType, sourceId);
+        await sendResponseMessage(event, '時間格式錯誤。請使用：開始時間-結束時間\n例如：22:00-24:00', sourceType, sourceId, lineService);
         return;
       }
       
@@ -658,13 +658,13 @@ async function handleUpdateActivity(event, sourceType, sourceId, userMessage) {
       const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
       const endTimeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$|^24:00$/;
       if (!timeRegex.test(startTime) || !endTimeRegex.test(endTime)) {
-        await sendResponseMessage(event, '時間格式錯誤。請使用 HH:MM 格式\n例如：22:00-24:00', sourceType, sourceId);
+        await sendResponseMessage(event, '時間格式錯誤。請使用 HH:MM 格式\n例如：22:00-24:00', sourceType, sourceId, lineService);
         return;
       }
       
       // Check if start time is before end time
       if (startTime >= endTime) {
-        await sendResponseMessage(event, '開始時間必須早於結束時間。', sourceType, sourceId);
+        await sendResponseMessage(event, '開始時間必須早於結束時間。', sourceType, sourceId, lineService);
         return;
       }
       
@@ -672,34 +672,34 @@ async function handleUpdateActivity(event, sourceType, sourceId, userMessage) {
       updateData.end_time = endTime;
     } else if (updateType === '日期') {
       if (!isValidDate(updateValue)) {
-        await sendResponseMessage(event, '日期格式錯誤。請使用 YYYY-MM-DD 格式\n例如：2025-10-15', sourceType, sourceId);
+        await sendResponseMessage(event, '日期格式錯誤。請使用 YYYY-MM-DD 格式\n例如：2025-10-15', sourceType, sourceId, lineService);
         return;
       }
       updateData.date = updateValue;
     } else {
-      await sendResponseMessage(event, '更新類型錯誤。請使用：名稱、時間 或 日期\n例如：更新 17 名稱 教導站桌遊活動', sourceType, sourceId);
+      await sendResponseMessage(event, '更新類型錯誤。請使用：名稱、時間 或 日期\n例如：更新 17 名稱 教導站桌遊活動', sourceType, sourceId, lineService);
       return;
     }
 
     const updatedActivity = await activityService.updateActivity(activityId, updateData);
-    await sendResponseMessage(event, `✅ 活動已成功更新：\n${formatActivityForDisplay(updatedActivity)}`, sourceType, sourceId);
+    await sendResponseMessage(event, `✅ 活動已成功更新：\n${formatActivityForDisplay(updatedActivity)}`, sourceType, sourceId, lineService);
   } catch (error) {
     if (error.message === 'Activity not found') {
-      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId);
+      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId, lineService);
     } else {
       console.error('Error updating activity:', error);
-      await sendResponseMessage(event, '更新活動時發生錯誤，請稍後再試。', sourceType, sourceId);
+      await sendResponseMessage(event, '更新活動時發生錯誤，請稍後再試。', sourceType, sourceId, lineService);
     }
   }
 }
 
-async function handleCreateActivity(event, sourceType, sourceId, userMessage) {
+async function handleCreateActivity(event, sourceType, sourceId, userMessage, lineService, activityService) {
   try {
     // Parse command: "新增 日期 [時間] 活動名稱"
     // Support formats: "新增 2025-01-15 主日崇拜" or "新增 2025-01-15 09:00-11:00 主日崇拜"
     const parts = userMessage.split(' ');
     if (parts.length < 3) {
-      await sendResponseMessage(event, '格式錯誤。請使用：\n• 新增 [日期] [活動名稱]\n• 新增 [日期] [開始時間-結束時間] [活動名稱]\n例如：新增 2025-01-15 主日崇拜\n例如：新增 2025-01-15 09:00-11:00 主日崇拜', sourceType, sourceId);
+      await sendResponseMessage(event, '格式錯誤。請使用：\n• 新增 [日期] [活動名稱]\n• 新增 [日期] [開始時間-結束時間] [活動名稱]\n例如：新增 2025-01-15 主日崇拜\n例如：新增 2025-01-15 09:00-11:00 主日崇拜', sourceType, sourceId, lineService);
       return;
     }
 
@@ -723,18 +723,18 @@ async function handleCreateActivity(event, sourceType, sourceId, userMessage) {
 
     // Validate date format
     if (!isValidDate(date)) {
-      await sendResponseMessage(event, '日期格式錯誤。請使用 YYYY-MM-DD 格式，例如：2025-01-15', sourceType, sourceId);
+      await sendResponseMessage(event, '日期格式錯誤。請使用 YYYY-MM-DD 格式，例如：2025-01-15', sourceType, sourceId, lineService);
       return;
     }
 
     // Validate time format if provided
     if (startTime && !isValidTime(startTime)) {
-      await sendResponseMessage(event, '開始時間格式錯誤。請使用 HH:MM 格式，例如：09:00', sourceType, sourceId);
+      await sendResponseMessage(event, '開始時間格式錯誤。請使用 HH:MM 格式，例如：09:00', sourceType, sourceId, lineService);
       return;
     }
 
     if (endTime && !isValidTime(endTime)) {
-      await sendResponseMessage(event, '結束時間格式錯誤。請使用 HH:MM 格式，例如：11:00', sourceType, sourceId);
+      await sendResponseMessage(event, '結束時間格式錯誤。請使用 HH:MM 格式，例如：11:00', sourceType, sourceId, lineService);
       return;
     }
 
@@ -749,25 +749,25 @@ async function handleCreateActivity(event, sourceType, sourceId, userMessage) {
 
     const newActivity = await activityService.createActivity(activityData);
 
-    await sendResponseMessage(event, `✅ 活動已成功新增：\n${formatActivityForDisplay(newActivity)}`, sourceType, sourceId);
+    await sendResponseMessage(event, `✅ 活動已成功新增：\n${formatActivityForDisplay(newActivity)}`, sourceType, sourceId, lineService);
   } catch (error) {
     if (error.message.includes('validation') || error.message.includes('required')) {
-      await sendResponseMessage(event, '資料驗證錯誤：' + error.message, sourceType, sourceId);
+      await sendResponseMessage(event, '資料驗證錯誤：' + error.message, sourceType, sourceId, lineService);
     } else if (error.message.includes('duplicate') || error.message.includes('unique')) {
-      await sendResponseMessage(event, '此日期和活動名稱已存在，請使用不同的組合。', sourceType, sourceId);
+      await sendResponseMessage(event, '此日期和活動名稱已存在，請使用不同的組合。', sourceType, sourceId, lineService);
     } else {
       console.error('Error creating activity:', error);
-      await sendResponseMessage(event, '新增活動時發生錯誤，請稍後再試。', sourceType, sourceId);
+      await sendResponseMessage(event, '新增活動時發生錯誤，請稍後再試。', sourceType, sourceId, lineService);
     }
   }
 }
 
-async function handleDeleteActivity(event, sourceType, sourceId, userMessage) {
+async function handleDeleteActivity(event, sourceType, sourceId, userMessage, lineService, activityService) {
   try {
     // Parse command: "刪除 id"
     const parts = userMessage.split(' ');
     if (parts.length !== 2) {
-      await sendResponseMessage(event, '格式錯誤。請使用：刪除 [ID]\n例如：刪除 1', sourceType, sourceId);
+      await sendResponseMessage(event, '格式錯誤。請使用：刪除 [ID]\n例如：刪除 1', sourceType, sourceId, lineService);
       return;
     }
 
@@ -777,13 +777,13 @@ async function handleDeleteActivity(event, sourceType, sourceId, userMessage) {
     const activity = await activityService.getActivityById(activityId);
     await activityService.deleteActivity(activityId);
     
-    await sendResponseMessage(event, `✅ 活動已成功刪除：\n${formatActivityForDisplay(activity)}`, sourceType, sourceId);
+    await sendResponseMessage(event, `✅ 活動已成功刪除：\n${formatActivityForDisplay(activity)}`, sourceType, sourceId, lineService);
   } catch (error) {
     if (error.message === 'Activity not found') {
-      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId);
+      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId, lineService);
     } else {
       console.error('Error deleting activity:', error);
-      await sendResponseMessage(event, '刪除活動時發生錯誤，請稍後再試。', sourceType, sourceId);
+      await sendResponseMessage(event, '刪除活動時發生錯誤，請稍後再試。', sourceType, sourceId, lineService);
     }
   }
 }
