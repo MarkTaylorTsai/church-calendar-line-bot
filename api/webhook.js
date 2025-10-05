@@ -269,34 +269,53 @@ async function handleMessageEvent(event, lineService, activityService, isAuthori
   console.log('User authorized:', isAuthorized);
   
   if (message.type === 'text') {
-    const userMessage = message.text.toLowerCase().trim();
+    const userMessage = message.text.trim();
+    const lowerMessage = userMessage.toLowerCase();
     console.log('Processing text message:', userMessage);
     
+    // Only respond to specific commands - ignore everything else
+    const isCommand = lowerMessage === 'help' || 
+                     lowerMessage === '幫助' ||
+                     lowerMessage === 'test' ||
+                     lowerMessage.startsWith('list') ||
+                     lowerMessage.startsWith('列表') ||
+                     lowerMessage.startsWith('查看') ||
+                     lowerMessage.startsWith('add') ||
+                     lowerMessage.startsWith('create') ||
+                     lowerMessage.startsWith('新增') ||
+                     lowerMessage.startsWith('更新') ||
+                     lowerMessage.startsWith('刪除');
+    
+    if (!isCommand) {
+      console.log('Non-command message received, ignoring:', userMessage);
+      return; // Ignore non-command messages
+    }
+    
     // Handle different commands
-    if (userMessage === 'help' || userMessage === '幫助') {
+    if (lowerMessage === 'help' || lowerMessage === '幫助') {
       console.log('Handling help command');
       await sendResponseMessage(event, getHelpMessage(isAuthorized), sourceType, sourceId, lineService);
       logAccessAttempt({ body: { source: { userId } } }, 'HELP_COMMAND', true);
-    } else if (userMessage === 'test') {
+    } else if (lowerMessage === 'test') {
       console.log('Handling test command');
       await sendResponseMessage(event, 'Test message received! Bot is working.', sourceType, sourceId, lineService);
       logAccessAttempt({ body: { source: { userId } } }, 'TEST_COMMAND', true);
-    } else if (userMessage === 'list' || userMessage === '列表' || userMessage === '查看 全部') {
+    } else if (lowerMessage === 'list' || lowerMessage === '列表' || lowerMessage === '查看 全部') {
       await handleViewAllActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES', true);
-    } else if (userMessage === '查看 這個月' || userMessage === '查看 本月') {
+    } else if (lowerMessage === '查看 這個月' || lowerMessage === '查看 本月') {
       await handleViewMonthlyActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_MONTHLY_ACTIVITIES', true);
-    } else if (userMessage === '查看 這個禮拜' || userMessage === '查看 本週') {
+    } else if (lowerMessage === '查看 這個禮拜' || lowerMessage === '查看 本週') {
       await handleViewWeeklyActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_WEEKLY_ACTIVITIES', true);
-    } else if (userMessage === '查看 下周' || userMessage === '查看 下個禮拜') {
+    } else if (lowerMessage === '查看 下周' || lowerMessage === '查看 下個禮拜') {
       await handleViewNextWeekActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_WEEK_ACTIVITIES', true);
-    } else if (userMessage === '查看 下個月') {
+    } else if (lowerMessage === '查看 下個月') {
       await handleViewNextMonthActivities(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_NEXT_MONTH_ACTIVITIES', true);
-    } else if (userMessage === '查看 id' || userMessage === '查看 ID') {
+    } else if (lowerMessage === '查看 id' || lowerMessage === '查看 id') {
       await handleViewAllActivitiesWithIds(event, sourceType, sourceId, lineService, activityService);
       logAccessAttempt({ body: { source: { userId } } }, 'VIEW_ALL_ACTIVITIES_WITH_IDS', true);
     } else if (userMessage.startsWith('查看 ') && (userMessage.includes('月') || userMessage.includes('Month'))) {
@@ -328,7 +347,7 @@ async function handleMessageEvent(event, lineService, activityService, isAuthori
       }
     } else {
       console.log('Unknown command received:', userMessage);
-      await sendResponseMessage(event, 'Sorry, I don\'t understand that command. Type "help" for available commands.', sourceType, sourceId, lineService);
+      // Don't respond to unknown commands - just log and ignore
       logAccessAttempt({ body: { source: { userId } } }, 'UNKNOWN_COMMAND', false);
     }
   }
@@ -955,13 +974,13 @@ function getDayOfWeek(date) {
 }
 
 function getHelpMessage(isAuthorized = false) {
-  let message = `教會行事曆助理指令：\n\n• help - 顯示此幫助訊息\n• 查看 全部 - 查看所有活動\n• 查看 id - 查看所有活動（含ID）\n• 查看 這個月 - 查看本月活動\n• 查看 下個月 - 查看下個月活動\n• 查看 這個禮拜 - 查看本週活動\n• 查看 下周 - 查看下周活動\n• 查看 [月份] - 查看指定月份活動\n\n月份格式範例：\n• 查看 11月 - 查看11月活動\n• 查看 十一月 - 查看11月活動\n• 查看 11月 2025 - 查看2025年11月活動`;
+  let message = `📅 教會行事曆助理 📅\n\n🔍 查詢功能：\n• 📋 查看 全部 - 查看所有活動\n• 🆔 查看 id - 查看所有活動（含ID）\n• 📆 查看 這個月 - 查看本月活動\n• 📅 查看 下個月 - 查看下個月活動\n• 📊 查看 這個禮拜 - 查看本週活動\n• ⏭️ 查看 下周 - 查看下周活動\n• 🗓️ 查看 11月 - 查看指定月份活動`;
   
   if (isAuthorized) {
-    message += `\n\n管理員功能：\n• 新增 [日期] [活動名稱] - 新增活動\n• 新增 [日期] [開始時間-結束時間] [活動名稱] - 新增帶時間的活動\n• 更新 [ID] [日期/名稱/時間] - 更新活動\n• 刪除 [ID] - 刪除活動\n\n時間格式範例：\n• 新增 2025-01-15 主日崇拜\n• 新增 2025-01-15 09:00-11:00 主日崇拜`;
+    message += `\n\n⚙️ 管理員功能：\n• ➕ 新增 [日期] [活動名稱] - 新增活動\n• ➕ 新增 [日期] [時間] [活動名稱] - 新增帶時間的活動\n• ✏️ 更新 [ID] [日期/名稱/時間] - 更新活動\n• 🗑️ 刪除 [ID] - 刪除活動\n\n💡 範例：\n• 新增 2025-01-15 主日崇拜\n• 新增 2025-01-15 09:00-11:00 主日崇拜`;
   }
   
-  message += `\n\n更多功能即將推出！`;
+  message += `\n\n✨ 更多功能即將推出！`;
   
   return message;
 }
