@@ -1,12 +1,14 @@
 // Reminder business logic
 import { ActivityService } from './ActivityService.js';
 import { LineService } from './LineService.js';
+import { GroupService } from './GroupService.js';
 import { formatActivityMessage, getCurrentMonthAndYear } from '../lib/utils.js';
 
 export class ReminderService {
   constructor() {
     this.activityService = new ActivityService();
     this.lineService = new LineService();
+    this.groupService = new GroupService();
   }
 
   async sendMonthlyOverview() {
@@ -130,39 +132,38 @@ export class ReminderService {
 
   async sendToGroupsFromActivities(activities, message) {
     try {
-      // Get unique group IDs from activities that have line_group_id
-      const groupIds = [...new Set(activities
-        .filter(activity => activity.line_group_id)
-        .map(activity => activity.line_group_id)
-      )];
+      // Get all active groups from database
+      const groups = await this.groupService.getAllActiveGroups();
       
-      if (groupIds.length === 0) {
-        console.log('No groups found in activities');
+      if (groups.length === 0) {
+        console.log('No groups found in database');
         return [];
       }
       
       const results = [];
       
-      for (const groupId of groupIds) {
+      for (const group of groups) {
         try {
-          console.log(`Sending reminder to group: ${groupId}`);
-          const result = await this.lineService.sendMessage(groupId, message);
+          console.log(`Sending reminder to group: ${group.line_group_id}`);
+          const result = await this.lineService.sendMessage(group.line_group_id, message);
           results.push({
             success: true,
-            groupId: groupId,
+            groupId: group.line_group_id,
+            groupName: group.group_name,
             result: result
           });
         } catch (error) {
-          console.error(`Error sending message to group ${groupId}:`, error);
+          console.error(`Error sending message to group ${group.line_group_id}:`, error);
           results.push({
             success: false,
-            groupId: groupId,
+            groupId: group.line_group_id,
+            groupName: group.group_name,
             error: error.message
           });
         }
       }
       
-      console.log(`Sent reminders to ${results.filter(r => r.success).length}/${groupIds.length} groups`);
+      console.log(`Sent reminders to ${results.filter(r => r.success).length}/${groups.length} groups`);
       return results;
     } catch (error) {
       console.error('Error in sendToGroupsFromActivities:', error);

@@ -379,6 +379,14 @@ async function handleGroupJoinEvent(event, lineService) {
   const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
   
   try {
+    // Import GroupService
+    const { GroupService } = await import('../services/GroupService.js');
+    const groupService = new GroupService();
+    
+    // Add group to database
+    await groupService.addGroup(groupId);
+    console.log(`Group ${groupId} added to database`);
+    
     // Send welcome message
     await lineService.sendMessage(groupId, welcomeMessage);
     console.log('Welcome message sent to group successfully');
@@ -395,6 +403,18 @@ async function handleUnfollowEvent(event) {
 async function handleGroupLeaveEvent(event) {
   // Log group leave event for analytics
   console.log('Bot left group:', event.source.groupId);
+  
+  try {
+    // Import GroupService
+    const { GroupService } = await import('../services/GroupService.js');
+    const groupService = new GroupService();
+    
+    // Remove group from database
+    await groupService.removeGroup(event.source.groupId);
+    console.log(`Group ${event.source.groupId} removed from database`);
+  } catch (error) {
+    console.error('Error handling group leave event:', error);
+  }
 }
 
 // Helper function to send messages to different source types
