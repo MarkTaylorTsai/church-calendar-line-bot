@@ -10,14 +10,37 @@ export class GroupService {
     try {
       console.log(`Adding group ${groupId} to database`);
       
-      // Check if group already exists
-      const existingGroup = await this.getGroup(groupId);
+      // Check if group already exists (any status)
+      const existingGroup = await this.getGroupAnyStatus(groupId);
       if (existingGroup) {
-        console.log(`Group ${groupId} already exists in database`);
-        return { success: true, message: 'Group already exists' };
+        if (existingGroup.is_active) {
+          console.log(`Group ${groupId} already exists and is active`);
+          return { success: true, message: 'Group already exists and is active' };
+        } else {
+          // Reactivate the group
+          console.log(`Reactivating group ${groupId}`);
+          const { data, error } = await this.db.client
+            .from('groups')
+            .update({ 
+              is_active: true, 
+              updated_at: new Date().toISOString(),
+              group_name: groupName || existingGroup.group_name
+            })
+            .eq('line_group_id', groupId)
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Error reactivating group:', error);
+            throw error;
+          }
+
+          console.log(`Group ${groupId} reactivated successfully`);
+          return { success: true, message: 'Group reactivated successfully', data };
+        }
       }
 
-      // Add group to database
+      // Add new group to database
       const { data, error } = await this.db.client
         .from('groups')
         .insert([
@@ -30,6 +53,11 @@ export class GroupService {
         ]);
 
       if (error) {
+        // Handle duplicate key error gracefully
+        if (error.code === '23505') {
+          console.log(`Group ${groupId} already exists (duplicate key error)`);
+          return { success: true, message: 'Group already exists' };
+        }
         console.error('Error adding group:', error);
         throw error;
       }
@@ -37,6 +65,11 @@ export class GroupService {
       console.log(`Group ${groupId} added successfully`);
       return { success: true, message: 'Group added successfully', data };
     } catch (error) {
+      // Handle duplicate key error gracefully
+      if (error.code === '23505') {
+        console.log(`Group ${groupId} already exists (duplicate key error)`);
+        return { success: true, message: 'Group already exists' };
+      }
       console.error('Error in addGroup:', error);
       throw error;
     }
@@ -84,6 +117,26 @@ export class GroupService {
       return data;
     } catch (error) {
       console.error('Error in getGroup:', error);
+      throw error;
+    }
+  }
+
+  async getGroupAnyStatus(groupId) {
+    try {
+      const { data, error } = await this.db.client
+        .from('groups')
+        .select('*')
+        .eq('line_group_id', groupId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+        console.error('Error getting group:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getGroupAnyStatus:', error);
       throw error;
     }
   }
