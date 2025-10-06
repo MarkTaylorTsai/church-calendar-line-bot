@@ -8,7 +8,14 @@ export class ReminderService {
   constructor() {
     this.activityService = new ActivityService();
     this.lineService = new LineService();
-    this.groupService = new GroupService();
+    
+    // Initialize GroupService with error handling
+    try {
+      this.groupService = new GroupService();
+    } catch (error) {
+      console.error('Error initializing GroupService:', error);
+      this.groupService = null;
+    }
   }
 
   async sendMonthlyOverview() {
@@ -132,6 +139,12 @@ export class ReminderService {
 
   async sendToGroupsFromActivities(activities, message) {
     try {
+      // Check if GroupService is available
+      if (!this.groupService) {
+        console.log('GroupService not available, skipping group reminders');
+        return [];
+      }
+      
       // Get all active groups from database
       const groups = await this.groupService.getAllActiveGroups();
       
@@ -167,7 +180,10 @@ export class ReminderService {
       return results;
     } catch (error) {
       console.error('Error in sendToGroupsFromActivities:', error);
-      throw error;
+      // Don't throw error - just log it and return empty results
+      // This prevents the entire cron job from failing if group service has issues
+      console.log('Continuing with broadcast-only reminders due to group service error');
+      return [];
     }
   }
 
