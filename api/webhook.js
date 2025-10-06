@@ -365,14 +365,6 @@ async function handleFollowEvent(event, lineService) {
   const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
   
   try {
-    // Import RecipientsService
-    const { RecipientsService } = await import('../services/GroupService.js');
-    const recipientsService = new RecipientsService();
-    
-    // Add user to recipients list
-    await recipientsService.addUserRecipient(userId);
-    console.log(`User ${userId} added to recipients list`);
-    
     // Send welcome message
     await lineService.sendMessage(userId, welcomeMessage);
     console.log('Welcome message sent successfully');
@@ -387,14 +379,6 @@ async function handleGroupJoinEvent(event, lineService) {
   const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
   
   try {
-    // Import RecipientsService
-    const { RecipientsService } = await import('../services/GroupService.js');
-    const recipientsService = new RecipientsService();
-    
-    // Add group to recipients list
-    await recipientsService.addGroupRecipient(groupId);
-    console.log(`Group ${groupId} added to recipients list`);
-    
     // Send welcome message
     await lineService.sendMessage(groupId, welcomeMessage);
     console.log('Welcome message sent to group successfully');
@@ -406,35 +390,11 @@ async function handleGroupJoinEvent(event, lineService) {
 async function handleUnfollowEvent(event) {
   // Log unfollow event for analytics
   console.log('User unfollowed:', event.source.userId);
-  
-  try {
-    // Import RecipientsService
-    const { RecipientsService } = await import('../services/GroupService.js');
-    const recipientsService = new RecipientsService();
-    
-    // Remove user from recipients list
-    await recipientsService.removeUserRecipient(event.source.userId);
-    console.log(`User ${event.source.userId} removed from recipients list`);
-  } catch (error) {
-    console.error('Error handling unfollow event:', error);
-  }
 }
 
 async function handleGroupLeaveEvent(event) {
   // Log group leave event for analytics
   console.log('Bot left group:', event.source.groupId);
-  
-  try {
-    // Import RecipientsService
-    const { RecipientsService } = await import('../services/GroupService.js');
-    const recipientsService = new RecipientsService();
-    
-    // Remove group from recipients list
-    await recipientsService.removeGroupRecipient(event.source.groupId);
-    console.log(`Group ${event.source.groupId} removed from recipients list`);
-  } catch (error) {
-    console.error('Error handling group leave event:', error);
-  }
 }
 
 // Helper function to send messages to different source types

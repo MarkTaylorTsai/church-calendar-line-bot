@@ -1,14 +1,12 @@
 // Reminder business logic
 import { ActivityService } from './ActivityService.js';
 import { LineService } from './LineService.js';
-import { RecipientsService } from './GroupService.js';
 import { formatActivityMessage, getCurrentMonthAndYear } from '../lib/utils.js';
 
 export class ReminderService {
   constructor() {
     this.activityService = new ActivityService();
     this.lineService = new LineService();
-    this.recipientsService = new RecipientsService();
   }
 
   async sendMonthlyOverview() {
@@ -22,15 +20,19 @@ export class ReminderService {
       
       const message = formatActivityMessage(activities, 'monthly');
       
-      // Send to all recipients (users and groups)
-      const recipientResults = await this.sendToRecipients(message);
+      // Send to individual users (broadcast)
+      const broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      
+      // Send to groups (from activities with line_group_id)
+      const groupResults = await this.sendToGroupsFromActivities(activities, message);
       
       console.log(`Monthly overview sent successfully. ${activities.length} activities found.`);
       return {
         success: true,
         activitiesCount: activities.length,
         message: message,
-        recipientResults: recipientResults
+        broadcastResult: broadcastResult,
+        groupResults: groupResults
       };
     } catch (error) {
       console.error('Error sending monthly overview:', error);
@@ -48,15 +50,19 @@ export class ReminderService {
       
       const message = formatActivityMessage(activities, 'weekly');
       
-      // Send to all recipients (users and groups)
-      const recipientResults = await this.sendToRecipients(message);
+      // Send to individual users (broadcast)
+      const broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      
+      // Send to groups (from activities with line_group_id)
+      const groupResults = await this.sendToGroupsFromActivities(activities, message);
       
       console.log(`Weekly reminders sent successfully. ${activities.length} activities found.`);
       return {
         success: true,
         activitiesCount: activities.length,
         message: message,
-        recipientResults: recipientResults
+        broadcastResult: broadcastResult,
+        groupResults: groupResults
       };
     } catch (error) {
       console.error('Error sending weekly reminders:', error);
@@ -74,15 +80,19 @@ export class ReminderService {
       
       const message = formatActivityMessage(activities, 'daily');
       
-      // Send to all recipients (users and groups)
-      const recipientResults = await this.sendToRecipients(message);
+      // Send to individual users (broadcast)
+      const broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      
+      // Send to groups (from activities with line_group_id)
+      const groupResults = await this.sendToGroupsFromActivities(activities, message);
       
       console.log(`Daily reminders sent successfully. ${activities.length} activities found.`);
       return {
         success: true,
         activitiesCount: activities.length,
         message: message,
-        recipientResults: recipientResults
+        broadcastResult: broadcastResult,
+        groupResults: groupResults
       };
     } catch (error) {
       console.error('Error sending daily reminders:', error);
@@ -98,15 +108,19 @@ export class ReminderService {
       
       const message = formatActivityMessage(activities, messageType);
       
-      // Send to all recipients (users and groups)
-      const recipientResults = await this.sendToRecipients(message);
+      // Send to individual users (broadcast)
+      const broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      
+      // Send to groups (from activities with line_group_id)
+      const groupResults = await this.sendToGroupsFromActivities(activities, message);
       
       console.log(`Custom reminder sent successfully. ${activities.length} activities found.`);
       return {
         success: true,
         activitiesCount: activities.length,
         message: message,
-        recipientResults: recipientResults
+        broadcastResult: broadcastResult,
+        groupResults: groupResults
       };
     } catch (error) {
       console.error('Error sending custom reminder:', error);
@@ -114,50 +128,44 @@ export class ReminderService {
     }
   }
 
-  async sendToRecipients(message) {
+  async sendToGroupsFromActivities(activities, message) {
     try {
-      const recipients = await this.recipientsService.getAllRecipients();
+      // Get unique group IDs from activities that have line_group_id
+      const groupIds = [...new Set(activities
+        .filter(activity => activity.line_group_id)
+        .map(activity => activity.line_group_id)
+      )];
+      
+      if (groupIds.length === 0) {
+        console.log('No groups found in activities');
+        return [];
+      }
+      
       const results = [];
       
-      for (const recipient of recipients) {
+      for (const groupId of groupIds) {
         try {
-          let targetId, targetType;
-          
-          if (recipient.line_group_id) {
-            targetId = recipient.line_group_id;
-            targetType = 'group';
-            console.log(`Sending reminder to group: ${targetId}`);
-          } else if (recipient.line_user_id) {
-            targetId = recipient.line_user_id;
-            targetType = 'user';
-            console.log(`Sending reminder to user: ${targetId}`);
-          } else {
-            console.log('Skipping recipient with no valid ID');
-            continue;
-          }
-          
-          const result = await this.lineService.sendMessage(targetId, message);
+          console.log(`Sending reminder to group: ${groupId}`);
+          const result = await this.lineService.sendMessage(groupId, message);
           results.push({
             success: true,
-            targetId: targetId,
-            targetType: targetType,
+            groupId: groupId,
             result: result
           });
         } catch (error) {
-          console.error(`Error sending message to recipient:`, error);
+          console.error(`Error sending message to group ${groupId}:`, error);
           results.push({
             success: false,
-            targetId: recipient.line_group_id || recipient.line_user_id,
-            targetType: recipient.line_group_id ? 'group' : 'user',
+            groupId: groupId,
             error: error.message
           });
         }
       }
       
-      console.log(`Sent reminders to ${results.filter(r => r.success).length}/${recipients.length} recipients`);
+      console.log(`Sent reminders to ${results.filter(r => r.success).length}/${groupIds.length} groups`);
       return results;
     } catch (error) {
-      console.error('Error in sendToRecipients:', error);
+      console.error('Error in sendToGroupsFromActivities:', error);
       throw error;
     }
   }
