@@ -232,6 +232,12 @@ async function processEvent(event, lineService, activityService, isAuthorizedUse
     case 'unfollow':
       await handleUnfollowEvent(event);
       break;
+    case 'join':
+      await handleGroupJoinEvent(event, lineService);
+      break;
+    case 'leave':
+      await handleGroupLeaveEvent(event);
+      break;
     default:
       console.log('Unhandled event type:', event.type);
   }
@@ -366,9 +372,48 @@ async function handleFollowEvent(event, lineService) {
   }
 }
 
+async function handleGroupJoinEvent(event, lineService) {
+  console.log('Handling group join event for group:', event.source.groupId);
+  const groupId = event.source.groupId;
+  const welcomeMessage = `歡迎使用教會行事曆機器人！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
+  
+  try {
+    // Import GroupService
+    const { GroupService } = await import('../services/GroupService.js');
+    const groupService = new GroupService();
+    
+    // Add group to reminder list
+    await groupService.addGroup(groupId);
+    console.log(`Group ${groupId} added to reminder list`);
+    
+    // Send welcome message
+    await lineService.sendMessage(groupId, welcomeMessage);
+    console.log('Welcome message sent to group successfully');
+  } catch (error) {
+    console.error('Error handling group join event:', error);
+  }
+}
+
 async function handleUnfollowEvent(event) {
   // Log unfollow event for analytics
   console.log('User unfollowed:', event.source.userId);
+}
+
+async function handleGroupLeaveEvent(event) {
+  // Log group leave event for analytics
+  console.log('Bot left group:', event.source.groupId);
+  
+  try {
+    // Import GroupService
+    const { GroupService } = await import('../services/GroupService.js');
+    const groupService = new GroupService();
+    
+    // Remove group from reminder list
+    await groupService.removeGroup(event.source.groupId);
+    console.log(`Group ${event.source.groupId} removed from reminder list`);
+  } catch (error) {
+    console.error('Error handling group leave event:', error);
+  }
 }
 
 // Helper function to send messages to different source types
