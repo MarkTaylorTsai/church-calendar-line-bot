@@ -18,7 +18,7 @@ export class GroupService {
       }
 
       // Add group to database
-      const { data, error } = await this.db.supabase
+      const { data, error } = await this.db.client
         .from('groups')
         .insert([
           {
@@ -46,7 +46,7 @@ export class GroupService {
     try {
       console.log(`Removing group ${groupId} from database`);
       
-      const { error } = await this.db.supabase
+      const { error } = await this.db.client
         .from('groups')
         .update({ 
           is_active: false, 
@@ -69,7 +69,7 @@ export class GroupService {
 
   async getGroup(groupId) {
     try {
-      const { data, error } = await this.db.supabase
+      const { data, error } = await this.db.client
         .from('groups')
         .select('*')
         .eq('line_group_id', groupId)
@@ -90,7 +90,7 @@ export class GroupService {
 
   async getAllActiveGroups() {
     try {
-      const { data, error } = await this.db.supabase
+      const { data, error } = await this.db.client
         .from('groups')
         .select('*')
         .eq('is_active', true)
