@@ -132,6 +132,17 @@ export class ActivityService {
     }
   }
 
+  async getActivitiesForToday() {
+    try {
+      const { startDate, endDate } = this.getTodayDateRange();
+      const activities = await this.db.getActivitiesByDateRange(startDate, endDate);
+      return activities;
+    } catch (error) {
+      console.error('Error fetching activities for today:', error);
+      throw error;
+    }
+  }
+
   async getActivitiesForTomorrow() {
     try {
       const { startDate, endDate } = this.getTomorrowDateRange();
@@ -167,6 +178,18 @@ export class ActivityService {
     nextWeekEnd.setHours(23, 59, 59, 999);
     
     return { startDate: nextWeekStart, endDate: nextWeekEnd };
+  }
+
+  getTodayDateRange() {
+    const today = new Date();
+    
+    const startDate = new Date(today);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(today);
+    endDate.setHours(23, 59, 59, 999);
+    
+    return { startDate, endDate };
   }
 
   getTomorrowDateRange() {

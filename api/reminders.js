@@ -92,10 +92,10 @@ async function sendDailyReminders(req, res) {
       data: result
     });
   } catch (error) {
-    if (error.message === 'No activities found for tomorrow') {
+    if (error.message === 'No activities found for today') {
       return res.status(200).json({
         success: true,
-        message: 'No activities found for tomorrow',
+        message: 'No activities found for today',
         data: null
       });
     }

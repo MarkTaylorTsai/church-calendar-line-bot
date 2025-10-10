@@ -81,10 +81,10 @@ export class ReminderService {
 
   async sendDailyReminders() {
     try {
-      const activities = await this.activityService.getActivitiesForTomorrow();
+      const activities = await this.activityService.getActivitiesForToday();
       
       if (activities.length === 0) {
-        throw new Error('No activities found for tomorrow');
+        throw new Error('No activities found for today');
       }
       
       const message = formatActivityMessage(activities, 'daily');
