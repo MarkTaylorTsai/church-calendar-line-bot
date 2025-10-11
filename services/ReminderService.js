@@ -90,7 +90,18 @@ export class ReminderService {
       const message = formatActivityMessage(activities, 'daily');
       
       // Send to individual users (broadcast)
-      const broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      let broadcastResult = null;
+      try {
+        broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      } catch (error) {
+        console.error('Error sending broadcast message:', error);
+        if (error.response?.status === 429 && error.response?.data?.message?.includes('monthly limit')) {
+          console.error('Monthly limit reached for LINE API. Cannot send broadcast message.');
+          broadcastResult = { error: 'Monthly limit reached - cannot send broadcast message' };
+        } else {
+          throw error;
+        }
+      }
       
       // Send to groups (from activities with line_group_id)
       const groupResults = await this.sendToGroupsFromActivities(activities, message);
@@ -165,14 +176,39 @@ export class ReminderService {
             groupName: group.group_name,
             result: result
           });
+          
+          // Add delay between group messages to avoid rate limiting
+          if (groups.indexOf(group) < groups.length - 1) {
+            console.log('Waiting 1 second before sending to next group...');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         } catch (error) {
           console.error(`Error sending message to group ${group.line_group_id}:`, error);
+          
+          // Check if it's a monthly limit error
+          if (error.response?.status === 429 && error.response?.data?.message?.includes('monthly limit')) {
+            console.error('Monthly limit reached for LINE API. Stopping group message sending.');
+            results.push({
+              success: false,
+              groupId: group.line_group_id,
+              groupName: group.group_name,
+              error: 'Monthly limit reached - cannot send more messages this month'
+            });
+            break; // Stop sending to remaining groups
+          }
+          
           results.push({
             success: false,
             groupId: group.line_group_id,
             groupName: group.group_name,
             error: error.message
           });
+          
+          // If rate limited, wait longer before continuing
+          if (error.response?.status === 429) {
+            console.log('Rate limited, waiting 5 seconds before continuing...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
         }
       }
       

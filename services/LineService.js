@@ -176,7 +176,7 @@ export class LineService {
         message = '📢 下週活動提醒：\n';
         break;
       case 'daily':
-        message = '⏰ 明天活動提醒：\n';
+        message = '⏰ 今日活動提醒：\n';
         break;
       default:
         message = '📋 活動提醒：\n';
@@ -335,7 +335,7 @@ function formatActivityMessage(activities, type = 'list') {
       message = '📢 下週活動：\n';
       break;
     case 'daily':
-      message = '⏰ 明天活動：\n';
+      message = '⏰ 今日活動：\n';
       break;
     default:
       message = '📋 活動列表：\n';
