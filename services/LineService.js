@@ -173,7 +173,7 @@ export class LineService {
         message = '📅 本月活動提醒：\n';
         break;
       case 'weekly':
-        message = '📢 下週活動提醒：\n';
+        message = '📢 本週活動提醒：\n';
         break;
       case 'daily':
         message = '⏰ 今日活動提醒：\n';
@@ -332,7 +332,7 @@ function formatActivityMessage(activities, type = 'list') {
       message = '📅 本月活動：\n';
       break;
     case 'weekly':
-      message = '📢 下週活動：\n';
+      message = '📢 本週活動：\n';
       break;
     case 'daily':
       message = '⏰ 今日活動：\n';

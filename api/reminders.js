@@ -71,10 +71,10 @@ async function sendWeeklyReminders(req, res) {
       data: result
     });
   } catch (error) {
-    if (error.message === 'No activities found for next week') {
+    if (error.message === 'No activities found for this week') {
       return res.status(200).json({
         success: true,
-        message: 'No activities found for next week',
+        message: 'No activities found for this week',
         data: null
       });
     }

@@ -51,10 +51,10 @@ export class ReminderService {
 
   async sendWeeklyReminders() {
     try {
-      const activities = await this.activityService.getActivitiesForNextWeek();
+      const activities = await this.activityService.getActivitiesForThisWeek();
       
       if (activities.length === 0) {
-        throw new Error('No activities found for next week');
+        throw new Error('No activities found for this week');
       }
       
       const message = formatActivityMessage(activities, 'weekly');
