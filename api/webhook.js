@@ -206,7 +206,7 @@ async function handleLineWebhook(req, res, lineService, activityService, isAutho
   for (const event of events) {
     try {
       console.log('Processing event:', event.type);
-      await processEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt);
+      await processEventWithTimeout(event, lineService, activityService, isAuthorizedUser, logAccessAttempt, 8000); // 8 second timeout per event
     } catch (error) {
       console.error('Error processing event:', error);
       // Continue processing other events even if one fails
@@ -241,6 +241,25 @@ async function processEvent(event, lineService, activityService, isAuthorizedUse
     default:
       console.log('Unhandled event type:', event.type);
   }
+}
+
+async function processEventWithTimeout(event, lineService, activityService, isAuthorizedUser, logAccessAttempt, timeoutMs = 8000) {
+  return new Promise(async (resolve, reject) => {
+    const timeout = setTimeout(() => {
+      console.log(`Event processing timed out after ${timeoutMs}ms`);
+      resolve(); // Don't reject, just resolve to continue processing
+    }, timeoutMs);
+
+    try {
+      await processEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt);
+      clearTimeout(timeout);
+      resolve();
+    } catch (error) {
+      clearTimeout(timeout);
+      console.error('Error in timeout-protected event processing:', error);
+      resolve(); // Don't reject, just resolve to continue processing
+    }
+  });
 }
 
 async function handleMessageEvent(event, lineService, activityService, isAuthorizedUser, logAccessAttempt) {
@@ -422,27 +441,27 @@ async function sendResponseMessage(event, message, sourceType, sourceId, lineSer
   console.log(`Attempting to send message. SourceType: ${sourceType}, SourceId: ${sourceId}, ReplyToken: ${event.replyToken}`);
   
   try {
+    // Try reply token FIRST for ALL messages (if available)
+    if (event.replyToken) {
+      try {
+        console.log('Sending reply message with token:', event.replyToken);
+        await lineService.sendReplyMessage(event.replyToken, message);
+        console.log('Reply message sent successfully');
+        return;
+      } catch (replyError) {
+        console.error('Reply message failed, trying fallback:', replyError);
+      }
+    } else {
+      console.log('No reply token available, using direct message');
+    }
+    
+    // Fallback to direct message for users
     if (sourceType === 'user') {
-      // For direct messages, use the regular sendMessage method
       console.log('Sending direct message to user:', sourceId);
       await lineService.sendMessage(sourceId, message);
       console.log('Direct message sent successfully');
     } else {
-      // For group/room messages, try reply first, then fallback to direct message
-      if (event.replyToken) {
-        try {
-          console.log('Sending reply message with token:', event.replyToken);
-          await lineService.sendReplyMessage(event.replyToken, message);
-          console.log('Reply message sent successfully');
-          return;
-        } catch (replyError) {
-          console.error('Reply message failed, trying direct message fallback:', replyError);
-        }
-      } else {
-        console.log('No reply token available, using direct message');
-      }
-      
-      // Fallback to direct message
+      // For group/room messages, send to the user who sent the message
       console.log('Sending fallback direct message to user:', event.source.userId);
       await lineService.sendMessage(event.source.userId, message);
       console.log('Fallback direct message sent successfully');
@@ -838,18 +857,31 @@ async function handleDeleteActivity(event, sourceType, sourceId, userMessage, li
 
     const activityId = parseInt(parts[1]);
     
+    // Validate activity ID
+    if (isNaN(activityId) || activityId <= 0) {
+      await sendResponseMessage(event, '無效的活動ID。請輸入有效的數字。', sourceType, sourceId, lineService);
+      return;
+    }
+    
     // Get activity details before deletion for confirmation message
-    const activity = await activityService.getActivityById(activityId);
+    let activity;
+    try {
+      activity = await activityService.getActivityById(activityId);
+    } catch (error) {
+      if (error.message === 'Activity not found') {
+        await sendResponseMessage(event, '找不到指定的活動。請確認活動ID是否正確。', sourceType, sourceId, lineService);
+        return;
+      }
+      throw error; // Re-throw other errors
+    }
+    
+    // Delete the activity
     await activityService.deleteActivity(activityId);
     
     await sendResponseMessage(event, `✅ 活動已成功刪除：\n${formatActivityForDisplay(activity)}`, sourceType, sourceId, lineService);
   } catch (error) {
-    if (error.message === 'Activity not found') {
-      await sendResponseMessage(event, '找不到指定的活動。', sourceType, sourceId, lineService);
-    } else {
-      console.error('Error deleting activity:', error);
-      await sendResponseMessage(event, '刪除活動時發生錯誤，請稍後再試。', sourceType, sourceId, lineService);
-    }
+    console.error('Error deleting activity:', error);
+    await sendResponseMessage(event, '刪除活動時發生錯誤，請稍後再試。', sourceType, sourceId, lineService);
   }
 }
 

@@ -21,13 +21,31 @@ export class LineService {
     }
 
     try {
-      const result = await this.lineApi.sendMessage(userId, message);
+      const result = await this.sendMessageWithTimeout(userId, message, 5000); // 5 second timeout for webhooks
       console.log(`Message sent successfully to user ${userId}`);
       return result;
     } catch (error) {
       console.error('Error sending message to user:', error);
       throw error;
     }
+  }
+
+  async sendMessageWithTimeout(userId, message, timeoutMs = 5000) {
+    return new Promise(async (resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.log(`Message sending timed out after ${timeoutMs}ms`);
+        reject(new Error('Message sending timed out'));
+      }, timeoutMs);
+
+      try {
+        const result = await this.lineApi.sendMessage(userId, message);
+        clearTimeout(timeout);
+        resolve(result);
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
   }
 
   async sendReplyMessage(replyToken, message) {
@@ -38,13 +56,31 @@ export class LineService {
     }
 
     try {
-      const result = await this.lineApi.sendReplyMessage(replyToken, message);
+      const result = await this.sendReplyMessageWithTimeout(replyToken, message, 5000); // 5 second timeout
       console.log(`Reply message sent successfully`);
       return result;
     } catch (error) {
       console.error('Error sending reply message:', error);
       throw error;
     }
+  }
+
+  async sendReplyMessageWithTimeout(replyToken, message, timeoutMs = 5000) {
+    return new Promise(async (resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.log(`Reply message sending timed out after ${timeoutMs}ms`);
+        reject(new Error('Reply message sending timed out'));
+      }, timeoutMs);
+
+      try {
+        const result = await this.lineApi.sendReplyMessage(replyToken, message);
+        clearTimeout(timeout);
+        resolve(result);
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
   }
 
   async sendBroadcastMessage(message) {
