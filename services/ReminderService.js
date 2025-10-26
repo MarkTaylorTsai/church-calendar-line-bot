@@ -59,11 +59,24 @@ export class ReminderService {
       
       const message = formatActivityMessage(activities, 'weekly');
       
-      // Send to individual users (broadcast)
-      const broadcastResult = await this.lineService.sendBroadcastMessage(message);
+      // Send to individual users (broadcast) - prioritize this
+      let broadcastResult = null;
+      try {
+        broadcastResult = await this.lineService.sendBroadcastMessage(message);
+        console.log('Broadcast message sent successfully');
+      } catch (error) {
+        console.error('Error sending broadcast message:', error);
+        // Continue with group messages even if broadcast fails
+      }
       
-      // Send to groups (from activities with line_group_id)
-      const groupResults = await this.sendToGroupsFromActivities(activities, message);
+      // Send to groups with timeout protection
+      let groupResults = [];
+      try {
+        groupResults = await this.sendToGroupsFromActivitiesWithTimeout(activities, message, 5000); // 5 second timeout
+      } catch (error) {
+        console.error('Error sending to groups:', error);
+        // Don't fail the entire operation if groups fail
+      }
       
       console.log(`Weekly reminders sent successfully. ${activities.length} activities found.`);
       return {
@@ -177,10 +190,10 @@ export class ReminderService {
             result: result
           });
           
-          // Add delay between group messages to avoid rate limiting
+          // Add shorter delay between group messages to avoid rate limiting
           if (groups.indexOf(group) < groups.length - 1) {
-            console.log('Waiting 1 second before sending to next group...');
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log('Waiting 500ms before sending to next group...');
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
         } catch (error) {
           console.error(`Error sending message to group ${group.line_group_id}:`, error);
@@ -204,10 +217,10 @@ export class ReminderService {
             error: error.message
           });
           
-          // If rate limited, wait longer before continuing
+          // If rate limited, wait before continuing
           if (error.response?.status === 429) {
-            console.log('Rate limited, waiting 5 seconds before continuing...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
+            console.log('Rate limited, waiting 2 seconds before continuing...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
       }
@@ -221,6 +234,25 @@ export class ReminderService {
       console.log('Continuing with broadcast-only reminders due to group service error');
       return [];
     }
+  }
+
+  async sendToGroupsFromActivitiesWithTimeout(activities, message, timeoutMs = 5000) {
+    return new Promise(async (resolve, reject) => {
+      const timeout = setTimeout(() => {
+        console.log(`Group sending timed out after ${timeoutMs}ms, returning partial results`);
+        resolve([]); // Return empty results on timeout
+      }, timeoutMs);
+
+      try {
+        const results = await this.sendToGroupsFromActivities(activities, message);
+        clearTimeout(timeout);
+        resolve(results);
+      } catch (error) {
+        clearTimeout(timeout);
+        console.error('Error in timeout-protected group sending:', error);
+        resolve([]); // Return empty results on error
+      }
+    });
   }
 
   async sendReminderToUser(userId, activities, messageType = 'custom') {
