@@ -101,18 +101,18 @@ export class LineService {
   }
 
   async sendWelcomeMessage(userId) {
-    const welcomeMessage = `歡迎使用教會行事曆助理！\n\n我可以幫您：\n• 管理教會活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
+    const welcomeMessage = `歡迎使用待辦事項提醒助理！\n\n我可以幫您：\n• 管理您的待辦事項和活動\n• 發送提醒通知\n\n輸入 "help" 查看可用指令。`;
     
     return await this.sendMessage(userId, welcomeMessage);
   }
 
   async sendHelpMessage(userId) {
-    const helpMessage = `教會行事曆機器人指令：\n\n• help - 顯示此幫助訊息\n• list - 查看活動列表\n\n更多功能即將推出！`;
+    const helpMessage = `待辦事項提醒助理指令：\n\n• help - 顯示此幫助訊息\n• list - 查看事項列表\n\n更多功能即將推出！`;
     
     return await this.sendMessage(userId, helpMessage);
   }
 
-  async sendActivityList(userId, activities, title = '活動列表') {
+  async sendActivityList(userId, activities, title = '待辦事項列表') {
     if (!activities || activities.length === 0) {
       const message = `目前沒有${title}安排。`;
       return await this.sendMessage(userId, message);
@@ -140,7 +140,7 @@ export class LineService {
     return await this.sendMessage(userId, message.trim());
   }
 
-  async sendActivityListWithIds(userId, activities, title = '活動列表') {
+  async sendActivityListWithIds(userId, activities, title = '待辦事項列表') {
     if (!activities || activities.length === 0) {
       const message = `目前沒有${title}安排。`;
       return await this.sendMessage(userId, message);
@@ -206,16 +206,16 @@ export class LineService {
     
     switch (reminderType) {
       case 'monthly':
-        message = '📅 本月活動提醒：\n';
+        message = '📅 本月待辦事項提醒：\n';
         break;
       case 'weekly':
-        message = '📢 本週活動提醒：\n';
+        message = '📢 本週待辦事項提醒：\n';
         break;
       case 'daily':
-        message = '⏰ 今日活動提醒：\n';
+        message = '⏰ 今日待辦事項提醒：\n';
         break;
       default:
-        message = '📋 活動提醒：\n';
+        message = '📋 待辦事項提醒：\n';
     }
 
     if (activities && activities.length > 0) {
@@ -225,7 +225,7 @@ export class LineService {
         message += `${formattedDate} ${dayOfWeek} ${activity.name}\n`;
       });
     } else {
-      message += '目前沒有活動安排。';
+      message += '目前沒有待辦事項。';
     }
 
     return await this.sendMessage(userId, message.trim());
@@ -236,13 +236,13 @@ export class LineService {
     
     switch (action) {
       case 'activity_created':
-        message = `✅ 活動已成功創建：\n${details}`;
+        message = `✅ 待辦事項已成功創建：\n${details}`;
         break;
       case 'activity_updated':
-        message = `✅ 活動已成功更新：\n${details}`;
+        message = `✅ 待辦事項已成功更新：\n${details}`;
         break;
       case 'activity_deleted':
-        message = `✅ 活動已成功刪除：\n${details}`;
+        message = `✅ 待辦事項已成功刪除：\n${details}`;
         break;
       default:
         message = `✅ 操作成功：\n${details}`;
@@ -358,23 +358,23 @@ function formatTimeToHHMM(timeString) {
 
 function formatActivityMessage(activities, type = 'list') {
   if (!activities || activities.length === 0) {
-    return '目前沒有活動安排。';
+    return '目前沒有待辦事項。';
   }
 
   let message = '';
   
   switch (type) {
     case 'monthly':
-      message = '📅 本月活動：\n';
+      message = '📅 本月待辦事項：\n';
       break;
     case 'weekly':
-      message = '📢 本週活動：\n';
+      message = '📢 本週待辦事項：\n';
       break;
     case 'daily':
-      message = '⏰ 今日活動：\n';
+      message = '⏰ 今日待辦事項：\n';
       break;
     default:
-      message = '📋 活動列表：\n';
+      message = '📋 待辦事項列表：\n';
   }
 
   activities.forEach(activity => {
